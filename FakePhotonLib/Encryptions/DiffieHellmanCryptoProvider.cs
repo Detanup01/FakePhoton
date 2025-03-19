@@ -20,7 +20,8 @@ public class DiffieHellmanCryptoProvider : IDisposable
             52, 194, 104, 33, 162, 218, 15, 201, byte.MaxValue, byte.MaxValue,
             byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, 0
         ];
-    private static readonly BigInteger primeRoot = new BigInteger(22);
+    private static readonly RandomNumberGenerator rng = RandomNumberGenerator.Create();
+    private static readonly BigInteger primeRoot = new(22);
     private readonly BigInteger prime;
     private readonly BigInteger secret;
     private readonly BigInteger publicKey;
@@ -33,39 +34,37 @@ public class DiffieHellmanCryptoProvider : IDisposable
         this.prime = new BigInteger(OakleyPrime768);
         this.secret = this.GenerateRandomSecret(160);
         this.publicKey = this.CalculatePublicKey();
-        var public_prev = this.CalculateSharedKey(publicKey).ToByteArray();
-        this.sharedKey = MsBigIntArrayToPhotonBigIntArray(public_prev);
-        byte[] array = SHA256.Create().ComputeHash(this.sharedKey);
-        this.crypto = Aes.Create();
-        this.crypto.Key = array;
-        this.crypto.IV = new byte[16];
-        this.crypto.Padding = PaddingMode.PKCS7;
-        Console.WriteLine(BitConverter.ToString(this.crypto.IV).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(this.crypto.Key).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(publicKey.ToByteArray()).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(sharedKey).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(public_prev).Replace("-", string.Empty));
     }
-    public void DeriveSharedKey(byte[] otherPartyPublicKey)
+
+    
+    public void DeriveSharedKeyServer(byte[] otherPartyPublicKey)
     {
-        Console.WriteLine("otherPartyPublicKey: " +BitConverter.ToString(otherPartyPublicKey).Replace("-", string.Empty));
-        otherPartyPublicKey = PhotonBigIntArrayToMsBigIntArray(otherPartyPublicKey);
-        Console.WriteLine("parsed: " + BitConverter.ToString(otherPartyPublicKey).Replace("-", string.Empty));
         BigInteger bigInteger = new BigInteger(otherPartyPublicKey);
         var shared_prev = this.CalculateSharedKey(bigInteger).ToByteArray();
-        Console.WriteLine("shared_prev: " + BitConverter.ToString(shared_prev).Replace("-", string.Empty));
-        this.sharedKey = MsBigIntArrayToPhotonBigIntArray(shared_prev);
-        Console.WriteLine("sharedKey: " + BitConverter.ToString(sharedKey).Replace("-", string.Empty));
+        this.sharedKey = shared_prev;
+
         byte[] array = SHA256.Create().ComputeHash(this.sharedKey);
         this.crypto = Aes.Create();
         this.crypto.Key = array;
         this.crypto.IV = new byte[16];
         this.crypto.Padding = PaddingMode.PKCS7;
-        Console.WriteLine(BitConverter.ToString(this.crypto.IV).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(this.crypto.Key).Replace("-", string.Empty));
-
-        
+        this.crypto.Mode = CipherMode.CBC;
     }
+
+    public void DeriveSharedKey(byte[] otherPartyPublicKey)
+    {
+        BigInteger bigInteger = new BigInteger(otherPartyPublicKey);
+        var shared_prev = this.CalculateSharedKey(bigInteger).ToByteArray();
+        this.sharedKey = shared_prev;
+
+        byte[] array = SHA256.Create().ComputeHash(this.sharedKey);
+        this.crypto = Aes.Create();
+        this.crypto.Key = array;
+        this.crypto.IV = new byte[16];
+        this.crypto.Padding = PaddingMode.PKCS7;
+        this.crypto.Mode = CipherMode.CBC;
+    }
+
     public bool IsInitialized
     {
         get
@@ -80,8 +79,17 @@ public class DiffieHellmanCryptoProvider : IDisposable
             return MsBigIntArrayToPhotonBigIntArray(this.publicKey.ToByteArray());
         }
     }
+
+    public byte[] PublicKeyForServer
+    {
+        get
+        {
+            return this.publicKey.ToByteArray();
+        }
+    }
     private BigInteger CalculatePublicKey()
     {
+
         return BigInteger.ModPow(primeRoot, this.secret, this.prime);
     }
     private BigInteger CalculateSharedKey(BigInteger otherPartyPublicKey)
@@ -91,16 +99,31 @@ public class DiffieHellmanCryptoProvider : IDisposable
 
     private BigInteger GenerateRandomSecret(int secretLength)
     {
-        RandomNumberGenerator rngcryptoServiceProvider = RandomNumberGenerator.Create();
-        byte[] array = new byte[secretLength / 8];
-        BigInteger bigInteger;
+        BigInteger result;
         do
         {
-            rngcryptoServiceProvider.GetBytes(array);
-            bigInteger = new BigInteger(array);
+            result = GenerateRandom(secretLength);
         }
-        while (bigInteger >= this.prime - 1 || bigInteger < 2L);
-        return bigInteger;
+        while (result >= this.prime - 1 || result < 2);
+        return result;
+    }
+
+    private static BigInteger GenerateRandom(int bits)
+    {
+        int bytes = bits >> 3;
+        if ((bits & 7) > 0)
+        {
+            bytes++;
+        }
+        byte[] randomBytes = new byte[bytes];
+        rng.GetBytes(randomBytes);
+        if ((randomBytes[bytes - 1] & 128) != 0)
+        {
+            byte[] temp = new byte[bytes + 1];
+            Buffer.BlockCopy(randomBytes, 0, temp, 0, bytes);
+            randomBytes = temp;
+        }
+        return new BigInteger(randomBytes);
     }
 
     public static byte[] PhotonBigIntArrayToMsBigIntArray(byte[] array)
@@ -161,12 +184,27 @@ public class DiffieHellmanCryptoProvider : IDisposable
         if (this.crypto == null)
             throw new InvalidOperationException("Cannot Decrypt");
         using ICryptoTransform cryptoTransform = this.crypto.CreateDecryptor();
-        Log.Information("{Data}, {Offset} {Count}", BitConverter.ToString(data), offset, count );
         return cryptoTransform.TransformFinalBlock(data, offset, count);
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+    }
+
+    public override string ToString()
+    {
+        string s = string.Empty;
+        if (crypto != null)
+        {
+            s += "Key: " + BitConverter.ToString(this.crypto.Key).Replace("-", string.Empty) + "\n";
+        }
+        s += BitConverter.ToString(publicKey.ToByteArray()).Replace("-", string.Empty) + "\n";
+        s += BitConverter.ToString(secret.ToByteArray()).Replace("-", string.Empty) + "\n";
+        if (sharedKey != null)
+        {
+            s += BitConverter.ToString(this.sharedKey).Replace("-", string.Empty) + "\n";
+        }
+        return s;
     }
 }

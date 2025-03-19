@@ -4,6 +4,7 @@ namespace FakePhotonLib.BinaryData;
 
 public class Header : IBinaryData
 {
+    public bool IsServer => PeerId == 0;
     public short PeerId = -1;
     public byte CrcOrEncrypted;
     public byte CommandCount;
@@ -41,7 +42,7 @@ public class Header : IBinaryData
     
     public override string ToString()
     {
-        return $"PeerId: {PeerId} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime} Challenge: {Challenge:x2}";
+        return $"Is Sent by Server: {IsServer} PeerId: {PeerId} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime} Challenge: {Challenge:x2}";
     }
 
     public object ParseToObject()

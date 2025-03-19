@@ -13,31 +13,24 @@ public static class EncryptionManager
     {
         byte[] bytes = Encoding.UTF8.GetBytes("AAAAAAAAAAAAAAAAAASSDFDSFGDG TETS TET TEST TEST ESTST EST SE  ET ET");
 
-        var serverCrypto = new DiffieHellmanCryptoProvider();
-        var key = serverCrypto.PublicKey;
-        Console.WriteLine("PublicKey: " + BitConverter.ToString(key).Replace("-", string.Empty));
+        var ClientEncryption = new DiffieHellmanCryptoProvider();
+        var ClientKey = ClientEncryption.PublicKey;
+        Console.WriteLine("Client: " + ClientEncryption.ToString());
+        var ServerEncryption = new DiffieHellmanCryptoProvider();
+        var ServerKey = ServerEncryption.PublicKey;
+        Console.WriteLine("Server: " + ServerEncryption.ToString());
+        Console.WriteLine("ClientKey: " + BitConverter.ToString(ClientKey));
+        Console.WriteLine("ServerKey: " + BitConverter.ToString(ServerKey));
+        ServerEncryption.DeriveSharedKey(ClientKey);
+        Console.WriteLine("Server: " + ServerEncryption.ToString());
+        ClientEncryption.DeriveSharedKey(ServerKey);
+        Console.WriteLine("Client: " + ClientEncryption.ToString());
 
-        var clientCrypto = new DiffieHellmanCryptoProvider();
-
-        clientCrypto.DeriveSharedKey(key);
-
-        var enc = serverCrypto.Encrypt(bytes);
-        var dec = serverCrypto.Decrypt(enc);
-        Console.WriteLine(BitConverter.ToString(bytes).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(dec).Replace("-", string.Empty));
-
-        enc = clientCrypto.Encrypt(bytes);
-        dec = clientCrypto.Decrypt(enc);
-
-        Console.WriteLine(BitConverter.ToString(bytes).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(dec).Replace("-", string.Empty));
-
-        enc = serverCrypto.Encrypt(bytes);
-        dec = clientCrypto.Decrypt(enc);
-
-        Console.WriteLine(BitConverter.ToString(bytes).Replace("-", string.Empty));
-        Console.WriteLine(BitConverter.ToString(dec).Replace("-", string.Empty));
-
+        var enc = ClientEncryption.Encrypt(bytes);
+        var dec = ServerEncryption.Decrypt(enc);
+        var ori =  BitConverter.ToString(bytes);
+        var dec_ori = BitConverter.ToString(dec);
+        Console.WriteLine("IsWorking: " + (ori == dec_ori));
 
     }
 }

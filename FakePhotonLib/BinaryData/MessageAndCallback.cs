@@ -46,6 +46,9 @@ public class MessageAndCallback : IBinaryData
         byte b2 =  reader.ReadByte();
         byte b3 = (byte)(b2 & 127);
         bool IsEncrypted = (b2 & 128) > 0;
+        bool flag7 = b3 != 1;
+        Console.WriteLine("IsEncrypted: " + IsEncrypted);
+        Console.WriteLine("Flag7: "+ flag7);
         if (IsEncrypted)
         {
             if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
