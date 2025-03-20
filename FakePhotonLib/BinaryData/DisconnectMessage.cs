@@ -1,7 +1,8 @@
 ﻿namespace FakePhotonLib.BinaryData;
 
-public class OperationRequest
+public class DisconnectMessage
 {
-    public byte OperationCode;
+    public short Code;
+    public string? DebugMessage;
     public Dictionary<byte, object> Parameters = [];
 }

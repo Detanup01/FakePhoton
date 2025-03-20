@@ -1,42 +1,53 @@
-﻿
+﻿namespace FakePhotonLib.BinaryData;
 
-namespace FakePhotonLib.BinaryData;
-
-public class EventData : IBinaryData
+public class EventData
 {
     public byte Code;
     public Dictionary<byte, object> Parameters = [];
     public byte SenderKey = 254;
-    private int sender = -1;
+    public int sender = -1;
     public byte CustomDataKey = 245;
-    private object customData;
-
-    public Type Type => typeof(EventData);
-
-    public void Reset()
+    public object? customData;
+    public int Sender
     {
-
+        get
+        {
+            bool flag = this.sender == -1;
+            if (flag)
+            {
+                object? num;
+                this.sender = (this.Parameters.TryGetValue(this.SenderKey, out num) ? (int)num : (-1));
+            }
+            return this.sender;
+        }
+        internal set
+        {
+            this.sender = value;
+        }
     }
 
-    public void Read(BinaryReader reader)
+    public object? CustomData
     {
-
+        get
+        {
+            bool flag = this.customData == null;
+            if (flag)
+            {
+                this.Parameters.TryGetValue(this.CustomDataKey, out this.customData);
+            }
+            return this.customData;
+        }
+        internal set
+        {
+            this.customData = value;
+        }
     }
 
-    public void Write(BinaryWriter writer)
+    internal void Reset()
     {
-
-    }
-
-    public object ParseToObject()
-    {
-        return this;
-    }
-
-    public object ReadToObject(BinaryReader reader)
-    {
-        this.Reset();
-        this.Read(reader);
-        return this;
+        this.Code = 0;
+        this.Parameters.Clear();
+        this.sender = -1;
+        this.customData = null;
     }
 }

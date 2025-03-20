@@ -1,12 +1,14 @@
 ﻿using FakePhotonLib.BinaryData;
-using FakePhotonLib.Encryptions;
+using Serilog;
 
 namespace FakePhotonLib.Managers;
 
 public static class MessageManager
 {
-    public static void Parse(MessageAndCallback messageAndCallback)
+    public static MessageAndCallback Parse(MessageAndCallback messageAndCallback)
     {
+        MessageAndCallback messageAndCallback1 = messageAndCallback;
+        // This for checking client what sent.
         if (messageAndCallback.operationResponse != null)
         {
             OperationResponseManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationResponse);
@@ -14,21 +16,13 @@ public static class MessageManager
 
         if (messageAndCallback.operationRequest != null)
         {
-            foreach (var item in messageAndCallback.operationRequest.Parameters)
-            {
-                Console.WriteLine(item.Key.ToString());
-                Console.WriteLine(item.Value.ToString());
-
-                if (item.Value.GetType() == typeof(byte[]))
-                {
-                    byte[] data = (byte[])item.Value;
-                    Console.WriteLine("Request key? " + BitConverter.ToString(data).Replace("-", string.Empty));
-
-                    var validKey = DiffieHellmanCryptoProvider.PhotonBigIntArrayToMsBigIntArray(data);
-                    Console.WriteLine("validKey? " + BitConverter.ToString(validKey).Replace("-", string.Empty));
-
-                }
-            }
+            messageAndCallback1.operationResponse = OperationRequestManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationRequest);
         }
+        if (messageAndCallback.IsInit != null)
+        {
+            messageAndCallback1.MessageType = RtsMessageType.InitResponse;
+        }
+        Log.Information(messageAndCallback1.ToString());
+        return messageAndCallback1;
     }
 }

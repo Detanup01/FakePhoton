@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using FakePhotonLib.PhotonRelated;
+using Serilog;
 using System;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -20,27 +21,49 @@ public class DiffieHellmanCryptoProvider : IDisposable
             52, 194, 104, 33, 162, 218, 15, 201, byte.MaxValue, byte.MaxValue,
             byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, 0
         ];
+    public static readonly byte[] OakleyPrime768_Photon =
+    [
+            byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, 201, 15,
+            218, 162, 33, 104, 194, 52, 196, 198, 98, 139,
+            128, 220, 28, 209, 41, 2, 78, 8, 138, 103,
+            204, 116, 2, 11, 190, 166, 59, 19, 155, 34,
+            81, 74, 8, 121, 142, 52, 4, 221, 239, 149,
+            25, 179, 205, 58, 67, 27, 48, 43, 10, 109,
+            242, 95, 20, 55, 79, 225, 53, 109, 109, 81,
+            194, 69, 228, 133, 181, 118, 98, 94, 126, 198,
+            244, 76, 66, 233, 166, 58, 54, 32, byte.MaxValue, byte.MaxValue,
+            byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue
+    ];
     private static readonly RandomNumberGenerator rng = RandomNumberGenerator.Create();
     private static readonly BigInteger primeRoot = new(22);
     private readonly BigInteger prime;
     private readonly BigInteger secret;
     private readonly BigInteger publicKey;
+
+    private static readonly BigIntegerPhoton primeRoot_photon = new(22);
+    private readonly BigIntegerPhoton prime_photon;
+    private readonly BigIntegerPhoton secret_photon;
+    private readonly BigIntegerPhoton publicKey_photon;
+
     private byte[]? sharedKey;
 
     private Aes? crypto;
 
     public DiffieHellmanCryptoProvider()
     {
-        this.prime = new BigInteger(OakleyPrime768);
+        this.prime = new(OakleyPrime768);
         this.secret = this.GenerateRandomSecret(160);
         this.publicKey = this.CalculatePublicKey();
+        this.prime_photon = new(OakleyPrime768_Photon);
+        this.secret_photon = new(secret.ToByteArray());
+        this.publicKey_photon = this.CalculatePublicKeyPhoton();
     }
 
     
-    public void DeriveSharedKeyServer(byte[] otherPartyPublicKey)
+    public void DeriveSharedKeyAsServer(byte[] otherPartyPublicKey)
     {
-        BigInteger bigInteger = new BigInteger(otherPartyPublicKey);
-        var shared_prev = this.CalculateSharedKey(bigInteger).ToByteArray();
+        BigIntegerPhoton bigInteger = new(otherPartyPublicKey);
+        var shared_prev = this.CalculateSharedKeyPhoton(bigInteger).GetBytes();
         this.sharedKey = shared_prev;
 
         byte[] array = SHA256.Create().ComputeHash(this.sharedKey);
@@ -51,10 +74,11 @@ public class DiffieHellmanCryptoProvider : IDisposable
         this.crypto.Mode = CipherMode.CBC;
     }
 
-    public void DeriveSharedKey(byte[] otherPartyPublicKey)
+    public void DeriveSharedKeyAsClient(byte[] otherPartyPublicKey)
     {
-        BigInteger bigInteger = new BigInteger(otherPartyPublicKey);
-        var shared_prev = this.CalculateSharedKey(bigInteger).ToByteArray();
+        otherPartyPublicKey = PhotonBigIntArrayToMsBigIntArray(otherPartyPublicKey);
+        BigInteger bigInteger = new(otherPartyPublicKey);
+        var shared_prev = MsBigIntArrayToPhotonBigIntArray(this.CalculateSharedKey(bigInteger).ToByteArray());
         this.sharedKey = shared_prev;
 
         byte[] array = SHA256.Create().ComputeHash(this.sharedKey);
@@ -72,7 +96,7 @@ public class DiffieHellmanCryptoProvider : IDisposable
             return this.crypto != null;
         }
     }
-    public byte[] PublicKey
+    public byte[] PublicKeyAsClient
     {
         get
         {
@@ -80,21 +104,31 @@ public class DiffieHellmanCryptoProvider : IDisposable
         }
     }
 
-    public byte[] PublicKeyForServer
+    public byte[] PublicKeyAsServer
     {
         get
         {
-            return this.publicKey.ToByteArray();
+            return this.publicKey_photon.GetBytes();
         }
     }
     private BigInteger CalculatePublicKey()
     {
-
         return BigInteger.ModPow(primeRoot, this.secret, this.prime);
     }
+
+    private BigIntegerPhoton CalculatePublicKeyPhoton()
+    {
+        return primeRoot_photon.ModPow(this.secret_photon, this.prime_photon);
+    }
+
     private BigInteger CalculateSharedKey(BigInteger otherPartyPublicKey)
     {
         return BigInteger.ModPow(otherPartyPublicKey, this.secret, this.prime);
+    }
+
+    private BigIntegerPhoton CalculateSharedKeyPhoton(BigIntegerPhoton otherPartyPublicKey)
+    {
+        return otherPartyPublicKey.ModPow(this.secret_photon, this.prime_photon);
     }
 
     private BigInteger GenerateRandomSecret(int secretLength)
@@ -102,13 +136,13 @@ public class DiffieHellmanCryptoProvider : IDisposable
         BigInteger result;
         do
         {
-            result = GenerateRandom(secretLength);
+            result = new(GenerateRandom(secretLength));
         }
         while (result >= this.prime - 1 || result < 2);
         return result;
     }
 
-    private static BigInteger GenerateRandom(int bits)
+    private static byte[] GenerateRandom(int bits)
     {
         int bytes = bits >> 3;
         if ((bits & 7) > 0)
@@ -123,7 +157,7 @@ public class DiffieHellmanCryptoProvider : IDisposable
             Buffer.BlockCopy(randomBytes, 0, temp, 0, bytes);
             randomBytes = temp;
         }
-        return new BigInteger(randomBytes);
+        return randomBytes;
     }
 
     public static byte[] PhotonBigIntArrayToMsBigIntArray(byte[] array)

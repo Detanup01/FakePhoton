@@ -8,7 +8,7 @@ public static class OperationResponseManager
 {
     public static void Parse(int challenge, OperationResponse operationResponse)
     {
-        if (operationResponse.Code == 0) // InitEncryption
+        if (operationResponse.OperationCode == 0) // InitEncryption
         {
             InitEncryption(challenge, operationResponse);
         }
@@ -22,7 +22,7 @@ public static class OperationResponseManager
             return;
         }
 
-        var data = (byte[])operationResponse.Parameter[1];
+        var data = (byte[])operationResponse.Parameters[1];
         if (data == null || data.Length == 0)
         {
             Log.Error("Establishing encryption keys failed. Server's public key is null or empty");
@@ -31,7 +31,7 @@ public static class OperationResponseManager
         Log.Information("Key: " + BitConverter.ToString(data).Replace("-", string.Empty));
         EncryptionManager.EncryptionByChallenge.Remove(challenge, out _);
         DiffieHellmanCryptoProvider encryption = new();
-        encryption.DeriveSharedKey(data);
+        encryption.DeriveSharedKeyAsClient(data);
         EncryptionManager.EncryptionByChallenge.Add(challenge, encryption);
     }
 }

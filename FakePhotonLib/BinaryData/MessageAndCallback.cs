@@ -1,4 +1,6 @@
 ﻿using FakePhotonLib.Managers;
+using FakePhotonLib.PhotonRelated;
+using FakePhotonLib.Protocols;
 using Serilog;
 
 namespace FakePhotonLib.BinaryData;
@@ -17,8 +19,12 @@ public enum RtsMessageType : byte
     Unknown = 255
 }
 
-public class MessageAndCallback : IBinaryData
+public class MessageAndCallback
 {
+    public MessageAndCallback()
+    {
+        Challenge = 0;
+    }
     public MessageAndCallback(int challenge)
     {
         Challenge = challenge;
@@ -28,12 +34,13 @@ public class MessageAndCallback : IBinaryData
     public bool IsNotValid;
     public OperationResponse? operationResponse;
     public OperationRequest? operationRequest;
+    public EventData? eventData;
+    public DisconnectMessage? disconnectMessage;
     public bool? IsInit;
+    public bool IsEncrypted;
 
 
-    public Type Type => typeof(MessageAndCallback);
-
-    public void Read(BinaryReader reader)
+    public void Read(StreamBuffer reader)
     {
         byte b = reader.ReadByte();
         IsNotValid = b != 243 && b != 253;
@@ -44,8 +51,11 @@ public class MessageAndCallback : IBinaryData
         }
 
         byte b2 =  reader.ReadByte();
+        Console.WriteLine($"b2: {b2}");
         byte b3 = (byte)(b2 & 127);
-        bool IsEncrypted = (b2 & 128) > 0;
+        Console.WriteLine($"b3: {b3}");
+        MessageType = (RtsMessageType)b3;
+        IsEncrypted = (b2 & 128) > 0;
         bool flag7 = b3 != 1;
         Console.WriteLine("IsEncrypted: " + IsEncrypted);
         Console.WriteLine("Flag7: "+ flag7);
@@ -56,41 +66,60 @@ public class MessageAndCallback : IBinaryData
                 Log.Error("This should not throw!");
                 return;
             }
-            var input = reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position));
-            Console.WriteLine(BitConverter.ToString(input).Replace("-", string.Empty));
-            var data = cryptoProvider.Decrypt(input);
-            Console.WriteLine(BitConverter.ToString(data).Replace("-", string.Empty));
-            MemoryStream ms = new MemoryStream(data);
-            reader = new BinaryReader(ms);
+            var data = cryptoProvider.Decrypt(reader.GetBuffer(), 2, reader.Length - 2);
+            reader = new(data);
         }
-        MessageType = (RtsMessageType)b3;
-        switch (b3)
+        switch (MessageType)
         {
-            case 1:
+            case RtsMessageType.Init:
                 IsInit = true;
                 break;
-            case 6:
-                operationRequest = new();
-                operationRequest.Read(reader);
+            case RtsMessageType.InitResponse:
+                
+            case RtsMessageType.InternalOperationRequest:
+                operationRequest = Protocol.ProtocolDefault.DeserializeOperationRequest(reader);
                 break;
-            case 7:
-                operationResponse = new();
-                operationResponse.Read(reader);
+            case RtsMessageType.OperationResponse:
+                operationResponse = Protocol.ProtocolDefault.DeserializeOperationResponse(reader);
+                break;
+            case RtsMessageType.Event:
+                eventData = Protocol.ProtocolDefault.DeserializeEventData(reader);
+                break;
+            case RtsMessageType.DisconnectMessage:
+                disconnectMessage = Protocol.ProtocolDefault.DeserializeDisconnectMessage(reader);
                 break;
             default:
+                Console.WriteLine("unkown! " + MessageType);
                 break;
         }
-        Console.WriteLine(b3);
     }
 
-    public void Reset()
+    public void Write(StreamBuffer writer)
     {
-
-    }
-
-    public void Write(BinaryWriter writer)
-    {
-
+        writer.WriteByte(253);
+        var msg_type = (byte)MessageType;
+        if (IsEncrypted)
+            msg_type |= 128;
+        writer.WriteByte(msg_type);
+        byte[] data = [];
+        if (operationResponse != null)
+            Protocol.ProtocolDefault.Serialize(operationResponse!);
+        if (operationRequest != null)
+            Protocol.ProtocolDefault.Serialize(operationRequest!);
+        if (eventData != null)
+            Protocol.ProtocolDefault.Serialize(eventData!);
+        if (disconnectMessage != null)
+            Protocol.ProtocolDefault.Serialize(disconnectMessage!);
+        if (IsEncrypted)
+        {
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
+            {
+                Log.Error("This should not throw!");
+                return;
+            }
+            data = cryptoProvider.Encrypt(data);
+        }
+        writer.Write(data, 0, data.Length);
     }
 
     public override string ToString()
@@ -98,17 +127,5 @@ public class MessageAndCallback : IBinaryData
         string? oprespone = operationResponse == null ? string.Empty : operationResponse.ToString();
         string? op_request = operationRequest == null ? string.Empty : operationRequest.ToString();
         return $"IsNotValid: {IsNotValid} {MessageType} {IsInit} {oprespone} {op_request}";
-    }
-
-    public object ParseToObject()
-    {
-        return this;
-    }
-
-    public object ReadToObject(BinaryReader reader)
-    {
-        this.Reset();
-        this.Read(reader);
-        return this;
     }
 }

@@ -1,10 +1,6 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Managers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using FakePhotonLib.PhotonRelated;
 
 namespace FakePhotonLib.PacketAnalyzer;
 
@@ -33,7 +29,7 @@ public static class Analyze
             }
         }
     }
-
+    static NCommandPool CommandPool = new();
     public static void SinglePacket(string packetAsHex)
     {
         MemoryStream ms = new MemoryStream(Convert.FromHexString(packetAsHex));
@@ -41,24 +37,21 @@ public static class Analyze
         Header header = new();
         header.Read(binaryReader);
         Console.WriteLine(header.ToString());
+        var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
+        StreamBuffer streamBuffer = new StreamBuffer(bytes);
+        int offset = 0;
         for (int i = 0; i < header.CommandCount; i++)
         {
             Console.WriteLine($"\n-- {i} --");
-            CommandPacket command = new();
-            command.Read(binaryReader);
+            NCommand command = CommandPool.Acquire(streamBuffer.GetBuffer(), ref offset);
             Console.WriteLine(command.ToString());
-            if (command.PayLoad != null)
+            if (command.Payload != null)
             {
                 MessageAndCallback messageAndCallback = new(header.Challenge);
                 try
                 {
-                    using MemoryStream ms2 = new MemoryStream(command.PayLoad);
-                    var payloadReader = new BinaryReader(ms2);
-                    messageAndCallback.Reset();
-                    messageAndCallback.Read(payloadReader);
-                    Console.WriteLine(messageAndCallback.ToString());
+                    messageAndCallback.Read(command.Payload);
                     MessageManager.Parse(messageAndCallback);
-                    payloadReader.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -66,12 +59,7 @@ public static class Analyze
                 }
             }
         }
-        var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
-        if (bytes != null && bytes.Length != 0)
-        {
-            Console.WriteLine("Remaining:");
-            Console.WriteLine(BitConverter.ToString(bytes).Replace("-", string.Empty));
-        }
+        Console.WriteLine($"Offset: {offset} Len : {streamBuffer.Length}");
     }
 
     static void ReadPacket()

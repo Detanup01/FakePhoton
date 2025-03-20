@@ -1,8 +1,9 @@
-﻿using System.Buffers.Binary;
+﻿using FakePhotonLib.PhotonRelated;
+using System.Buffers.Binary;
 
 namespace FakePhotonLib.BinaryData;
 
-public class Header : IBinaryData
+public class Header
 {
     public bool IsServer => PeerId == 0;
     public short PeerId = -1;
@@ -11,7 +12,8 @@ public class Header : IBinaryData
     public int ServerTime;
     public int Challenge;
 
-    public Type Type => typeof(Header);
+    public List<NCommand> Commands = [];
+
 
     public void Read(BinaryReader reader)
     {
@@ -43,17 +45,5 @@ public class Header : IBinaryData
     public override string ToString()
     {
         return $"Is Sent by Server: {IsServer} PeerId: {PeerId} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime} Challenge: {Challenge:x2}";
-    }
-
-    public object ParseToObject()
-    {
-        return this;
-    }
-
-    public object ReadToObject(BinaryReader reader)
-    {
-        this.Reset();
-        this.Read(reader);
-        return this;
     }
 }

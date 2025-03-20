@@ -9,8 +9,8 @@ internal class Program
     {
         
         LogManager.CreateNew();
-        //Analyze.Init();
-        EncryptionManager.EncryptionTest();
+        Analyze.Init();
+        //EncryptionManager.EncryptionTest();
         Console.ReadLine();
         LogManager.Close();
 
