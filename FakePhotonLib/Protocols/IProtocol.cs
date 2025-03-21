@@ -5,7 +5,7 @@ namespace FakePhotonLib.Protocols;
 
 public abstract class IProtocol
 {
-    public readonly ByteArraySlicePool ByteArraySlicePool = new ByteArraySlicePool();
+    public readonly ByteArraySlicePool ByteArraySlicePool = new();
 
     public abstract string ProtocolType { get; }
 
@@ -22,7 +22,7 @@ public abstract class IProtocol
     public abstract void SerializeOperationRequest(
       StreamBuffer stream,
       byte operationCode,
-      Dictionary<byte, object> parameters,
+      Dictionary<byte, object?>? parameters,
       bool setType);
 
     public abstract void SerializeOperationResponse(
@@ -30,7 +30,7 @@ public abstract class IProtocol
       OperationResponse serObject,
       bool setType);
 
-    public abstract object Deserialize(
+    public abstract object? Deserialize(
       StreamBuffer din,
       byte type,
       DeserializationFlags flags = DeserializationFlags.None);
@@ -56,20 +56,20 @@ public abstract class IProtocol
 
     public byte[] Serialize(object obj)
     {
-        StreamBuffer dout = new StreamBuffer(64);
+        StreamBuffer dout = new(64);
         Serialize(dout, obj, true);
         return dout.ToArray();
     }
 
-    public object Deserialize(StreamBuffer stream) => Deserialize(stream, stream.ReadByte());
+    public object? Deserialize(StreamBuffer stream) => Deserialize(stream, stream.ReadByte());
 
-    public object Deserialize(byte[] serializedData)
+    public object? Deserialize(byte[] serializedData)
     {
-        StreamBuffer din = new StreamBuffer(serializedData);
+        StreamBuffer din = new(serializedData);
         return Deserialize(din, din.ReadByte());
     }
 
-    public object DeserializeMessage(StreamBuffer stream)
+    public object? DeserializeMessage(StreamBuffer stream)
     {
         return Deserialize(stream, stream.ReadByte());
     }

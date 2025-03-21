@@ -4,8 +4,8 @@ namespace FakePhotonLib.Protocols;
 
 public class Protocol
 {
-    internal static readonly Dictionary<Type, CustomType> TypeDict = new();
-    internal static readonly Dictionary<byte, CustomType> CodeDict = new();
+    internal static readonly Dictionary<Type, CustomType> TypeDict = [];
+    internal static readonly Dictionary<byte, CustomType> CodeDict = [];
     public static IProtocol ProtocolDefault = new Protocol18();
     private static readonly float[] memFloatBlock = new float[1];
     private static readonly byte[] memDeserialize = new byte[4];

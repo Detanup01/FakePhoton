@@ -3,33 +3,33 @@
 public class StructWrapper<T> : StructWrapper
 {
     internal Pooling pooling;
-    internal T value;
-    internal static StructWrapperPool<T> staticPool = new StructWrapperPool<T>(true);
+    internal T? value;
+    internal static StructWrapperPool<T> staticPool = new(true);
 
-    public StructWrapperPool<T> ReturnPool { get; internal set; }
+    public StructWrapperPool<T>? ReturnPool { get; internal set; }
 
     public StructWrapper(Pooling releasing)
       : base(typeof(T), StructWrapperPool.GetWrappedType(typeof(T)))
     {
-        this.pooling = releasing;
+        pooling = releasing;
     }
 
     public StructWrapper(Pooling releasing, Type tType, WrappedType wType)
       : base(tType, wType)
     {
-        this.pooling = releasing;
+        pooling = releasing;
     }
 
-    public StructWrapper<T> Poke(byte value)
+    public StructWrapper<T> Poke(byte _)
     {
-        if (this.pooling == Pooling.Readonly)
+        if (pooling == Pooling.Readonly)
             throw new InvalidOperationException("Trying to Poke the value of a readonly StructWrapper<byte>. Value cannot be modified.");
         return this;
     }
 
-    public StructWrapper<T> Poke(bool value)
+    public StructWrapper<T> Poke(bool _)
     {
-        if (this.pooling == Pooling.Readonly)
+        if (pooling == Pooling.Readonly)
             throw new InvalidOperationException("Trying to Poke the value of a readonly StructWrapper<bool>. Value cannot be modified.");
         return this;
     }
@@ -40,44 +40,44 @@ public class StructWrapper<T> : StructWrapper
         return this;
     }
 
-    public T Unwrap()
+    public T? Unwrap()
     {
-        T obj = this.value;
-        if (this.pooling != Pooling.Readonly)
-            this.ReturnPool.Release(this);
+        T? obj = value;
+        if (pooling != Pooling.Readonly)
+            ReturnPool?.Release(this);
         return obj;
     }
 
-    public T Peek() => this.value;
+    public T? Peek() => value;
 
     public override object Box()
     {
-        T obj = this.value;
-        if (this.ReturnPool != null)
-            this.ReturnPool.Release(this);
-        return (object)obj;
+        T? obj = value;
+        ReturnPool?.Release(this);
+        return (object)obj!;
     }
 
     public override void Dispose()
     {
-        if ((this.pooling & Pooling.CheckedOut) != Pooling.CheckedOut || this.ReturnPool == null)
+        if ((pooling & Pooling.CheckedOut) != Pooling.CheckedOut || ReturnPool == null)
             return;
-        this.ReturnPool.Release(this);
+        GC.SuppressFinalize(this);
+        ReturnPool.Release(this);
     }
 
     public override void DisconnectFromPool()
     {
-        if (this.pooling == Pooling.Readonly)
+        if (pooling == Pooling.Readonly)
             return;
-        this.pooling = Pooling.Disconnected;
-        this.ReturnPool = (StructWrapperPool<T>)null;
+        pooling = Pooling.Disconnected;
+        ReturnPool = null;
     }
 
-    public override string ToString() => this.Unwrap().ToString();
+    public override string? ToString() => Unwrap()?.ToString();
 
     public override string ToString(bool writeTypeInfo)
     {
-        return writeTypeInfo ? string.Format("(StructWrapper<{0}>){1}", (object)this.wrappedType, (object)this.Unwrap().ToString()) : this.Unwrap().ToString();
+        return writeTypeInfo ? string.Format("(StructWrapper<{0}>){1}", wrappedType, Unwrap()?.ToString()!) : Unwrap()?.ToString()!;
     }
 
     public static implicit operator StructWrapper<T>(T value)

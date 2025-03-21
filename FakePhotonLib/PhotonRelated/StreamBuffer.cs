@@ -24,7 +24,7 @@ public class StreamBuffer
     public byte[] ToArrayFromPos()
     {
         int num = len - pos;
-        if (num <= 0) return Array.Empty<byte>();
+        if (num <= 0) return [];
         var array = new byte[num];
         Buffer.BlockCopy(buf, pos, array, 0, num);
         return array;
@@ -48,9 +48,9 @@ public class StreamBuffer
         return buf;
     }
 
-    public bool CanRead => true;
-    public bool CanSeek => true;
-    public bool CanWrite => true;
+    public static bool CanRead => true;
+    public static bool CanSeek => true;
+    public static bool CanWrite => true;
     public int Length => len;
 
     public int Position
@@ -69,7 +69,7 @@ public class StreamBuffer
 
     public int Available => Math.Max(0, len - pos);
 
-    public void Flush() => buf = Array.Empty<byte>();
+    public void Flush() => buf = [];
 
     public long Seek(long offset, SeekOrigin origin)
     {

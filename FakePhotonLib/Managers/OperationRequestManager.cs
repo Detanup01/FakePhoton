@@ -5,7 +5,7 @@ namespace FakePhotonLib.Managers;
 
 public static class OperationRequestManager
 {
-    public static OperationResponse Parse(int challenge, OperationRequest operationResponse)
+    public static OperationResponse? Parse(int challenge, OperationRequest operationResponse)
     {
         if (operationResponse.OperationCode == 0) // InitEncryption
         {
@@ -17,7 +17,7 @@ public static class OperationRequestManager
 
     internal static OperationResponse InitEncryption(int challenge, OperationRequest operationResponse)
     {
-        var data = (byte[])operationResponse.Parameters[1];
+        var data = (byte[])operationResponse.Parameters[1]!;
         if (data == null || data.Length == 0)
         {
             Log.Error("Establishing encryption keys failed. Server's public key is null or empty");

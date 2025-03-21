@@ -22,13 +22,13 @@ public static class OperationResponseManager
             return;
         }
 
-        var data = (byte[])operationResponse.Parameters[1];
+        var data = (byte[])operationResponse.Parameters[1]!;
         if (data == null || data.Length == 0)
         {
             Log.Error("Establishing encryption keys failed. Server's public key is null or empty");
             return;
         }
-        Log.Information("Key: " + BitConverter.ToString(data).Replace("-", string.Empty));
+        Log.Information("Key: " + Convert.ToHexString(data));
         EncryptionManager.EncryptionByChallenge.Remove(challenge, out _);
         DiffieHellmanCryptoProvider encryption = new();
         encryption.DeriveSharedKeyAsClient(data);

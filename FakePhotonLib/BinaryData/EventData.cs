@@ -15,8 +15,7 @@ public class EventData
             bool flag = this.sender == -1;
             if (flag)
             {
-                object? num;
-                this.sender = (this.Parameters.TryGetValue(this.SenderKey, out num) && num != null ? (int)num : (-1));
+                this.sender = (this.Parameters.TryGetValue(this.SenderKey, out object? num) && num != null ? (int)num : (-1));
             }
             return this.sender;
         }

@@ -8,33 +8,29 @@ using Serilog;
 
 namespace FakePhotonLib.Servers;
 
-public class PhotonUDPServer : UdpServer
+public class PhotonUDPServer(string uniqueName, IPAddress address, int port) : UdpServer(address, port)
 {
-    public string UniqueName;
-    public PhotonUDPServer(string uniqueName, IPAddress address, int port) : base(address, port)
-    {
-        UniqueName = uniqueName;
-    }
+    public string UniqueName = uniqueName;
 
     protected override void OnStarted()
     {
         base.OnStarted();
         ReceiveAsync();
     }
-    static NCommandPool CommandPool = new();
-    Queue<(EndPoint, Header)> EnqueueHeaders = new();
+    static readonly NCommandPool CommandPool = new();
+    readonly Queue<(EndPoint, Header)> EnqueueHeaders = new();
 
     protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
-        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", UniqueName, Endpoint, BitConverter.ToString(buf).Replace("-",string.Empty));
-        using BinaryReader binaryReader = new BinaryReader(new MemoryStream(buf));
+        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", UniqueName, Endpoint, Convert.ToHexString(buf));
+        using BinaryReader binaryReader = new(new MemoryStream(buf));
         Header header = new();
         header.Read(binaryReader);
         Console.WriteLine(header.ToString());
         var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
         binaryReader.Dispose();
-        StreamBuffer streamBuffer = new StreamBuffer(bytes);
+        StreamBuffer streamBuffer = new(bytes);
         int command_offset = 0;
         for (int i = 0; i < header.CommandCount; i++)
         {
@@ -71,12 +67,11 @@ public class PhotonUDPServer : UdpServer
         };
         byte commandCount = 0;
         StreamBuffer streamBuffer = new(); 
-        List<object> responses = [];
+        //List<object> responses = [];
         Queue<(EndPoint, Header)> NotOurs = new();
         foreach (var headers in EnqueueHeaders)
         {
-            if (toSendDest == null)
-                toSendDest = headers.Item1;
+            toSendDest ??= headers.Item1;
             if (toSendDest != headers.Item1)
             {
                 NotOurs.Enqueue(headers);
@@ -98,7 +93,8 @@ public class PhotonUDPServer : UdpServer
                     NCommand.CreateAck(bytes, offset, command, headers.Item2.ServerTime);
                     CommandPool.Release(command);
                 }
-                MessageManager.Parse(command.messageAndCallback);
+                if (command.messageAndCallback != null)
+                    MessageManager.Parse(command.messageAndCallback);
                 // TODO: logic for send
             }
             

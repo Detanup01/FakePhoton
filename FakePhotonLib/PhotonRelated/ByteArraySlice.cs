@@ -28,7 +28,11 @@ public class ByteArraySlice : IDisposable
     {
     }
 
-    public void Dispose() => Release();
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        Release();
+    }
 
     public bool Release()
     {

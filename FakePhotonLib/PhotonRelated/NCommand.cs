@@ -58,7 +58,7 @@ public class NCommand : IComparable<NCommand>
         AckUnsequenced = 16,
     }
 
-
+    /*
     public enum CommandSize
     {
         Minimum = 12,
@@ -73,6 +73,7 @@ public class NCommand : IComparable<NCommand>
         Fragment = 32,
         Max = 36
     }
+    */
 
     protected internal int SizeOfPayload => Payload?.Length ?? 0;
 

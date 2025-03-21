@@ -13,11 +13,11 @@ namespace FakePhotonLib.Protocols;
 
 public class Protocol16 : IProtocol
 {
-    private readonly byte[] versionBytes = new byte[2]
-    {
+    private readonly byte[] versionBytes =
+    [
       (byte) 1,
       (byte) 6
-    };
+    ];
     private readonly byte[] memShort = new byte[2];
     private readonly long[] memLongBlock = new long[1];
     private readonly byte[] memLongBlockBytes = new byte[8];

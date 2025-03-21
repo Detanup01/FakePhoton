@@ -2,7 +2,7 @@
 
 internal class NCommandPool
 {
-    public readonly Stack<NCommand> pool = new Stack<NCommand>();
+    public readonly Stack<NCommand> pool = new();
 
     public NCommand Acquire(byte[] inBuff, ref int readingOffset)
     {
@@ -11,8 +11,10 @@ internal class NCommandPool
         {
             if (pool.Count == 0)
             {
-                ncommand = new NCommand(inBuff, ref readingOffset);
-                ncommand.returnPool = this;
+                ncommand = new(inBuff, ref readingOffset)
+                {
+                    returnPool = this
+                };
             }
             else
             {
@@ -30,8 +32,10 @@ internal class NCommandPool
         {
             if (pool.Count == 0)
             {
-                ncommand = new NCommand(commandType, payload, channel);
-                ncommand.returnPool = this;
+                ncommand = new(commandType, payload, channel)
+                {
+                    returnPool = this
+                };
             }
             else
             {
