@@ -2,477 +2,255 @@
 using FakePhotonLib.PhotonRelated;
 using FakePhotonLib.PhotonRelated.StructWrapping;
 using Serilog;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace FakePhotonLib.Protocols;
 
 public class Protocol18 : IProtocol
 {
     public static readonly StructWrapperPools wrapperPools = new StructWrapperPools();
-    private readonly byte[] versionBytes = new byte[2]
-    {
-      (byte) 1,
-      (byte) 8
-    };
-    private static readonly byte[] boolMasks = new byte[8]
-    {
-      (byte) 1,
-      (byte) 2,
-      (byte) 4,
-      (byte) 8,
-      (byte) 16,
-      (byte) 32,
-      (byte) 64,
-      (byte) 128
-    };
+    private readonly byte[] versionBytes = [1, 8];
+    private static readonly byte[] boolMasks = [1, 2, 4, 8, 16, 32, 64, 128];
     private readonly double[] memDoubleBlock = new double[1];
     private readonly float[] memFloatBlock = new float[1];
     private readonly byte[] memCustomTypeBodyLengthSerialized = new byte[5];
     private readonly byte[] memCompressedUInt32 = new byte[5];
     private byte[] memCompressedUInt64 = new byte[10];
-
     public override string ProtocolType => "GpBinaryV18";
-
-    public override byte[] VersionBytes => this.versionBytes;
+    public override byte[] VersionBytes => versionBytes;
 
     public override void Serialize(StreamBuffer dout, object serObject, bool setType)
     {
-        this.Write(dout, serObject, setType);
+        Write(dout, serObject, setType);
     }
 
     public override void SerializeShort(StreamBuffer dout, short serObject, bool setType)
     {
-        this.WriteInt16(dout, serObject, setType);
+        WriteInt16(dout, serObject, setType);
     }
 
     public override void SerializeString(StreamBuffer dout, string serObject, bool setType)
     {
-        this.WriteString(dout, serObject, setType);
+        WriteString(dout, serObject, setType);
     }
 
-    public override object Deserialize(
-      StreamBuffer din,
-      byte type,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+    public override object Deserialize(StreamBuffer din, byte type, DeserializationFlags flags = DeserializationFlags.None)
     {
-        return this.Read(din, type);
+        return Read(din, type);
     }
 
-    public override short DeserializeShort(StreamBuffer din) => this.ReadInt16(din);
+    public override short DeserializeShort(StreamBuffer din) => ReadInt16(din);
 
-    public override byte DeserializeByte(StreamBuffer din) => this.ReadByte(din);
+    public override byte DeserializeByte(StreamBuffer din) => ReadByte(din);
 
-    private static Type GetAllowedDictionaryKeyTypes(Protocol18.GpType gpType)
-    {
-        switch (gpType)
+    private static Type GetAllowedDictionaryKeyTypes(GpType gpType) =>
+        gpType switch
         {
-            case Protocol18.GpType.Byte:
-            case Protocol18.GpType.ByteZero:
-                return typeof(byte);
-            case Protocol18.GpType.Short:
-            case Protocol18.GpType.ShortZero:
-                return typeof(short);
-            case Protocol18.GpType.Float:
-            case Protocol18.GpType.FloatZero:
-                return typeof(float);
-            case Protocol18.GpType.Double:
-            case Protocol18.GpType.DoubleZero:
-                return typeof(double);
-            case Protocol18.GpType.String:
-                return typeof(string);
-            case Protocol18.GpType.CompressedInt:
-            case Protocol18.GpType.Int1:
-            case Protocol18.GpType.Int1_:
-            case Protocol18.GpType.Int2:
-            case Protocol18.GpType.Int2_:
-            case Protocol18.GpType.IntZero:
-                return typeof(int);
-            case Protocol18.GpType.CompressedLong:
-            case Protocol18.GpType.L1:
-            case Protocol18.GpType.L1_:
-            case Protocol18.GpType.L2:
-            case Protocol18.GpType.L2_:
-            case Protocol18.GpType.LongZero:
-                return typeof(long);
-            default:
-                throw new Exception(string.Format("{0} is not a valid Type as Dictionary key.", (object)gpType));
-        }
-    }
+            GpType.Byte or GpType.ByteZero => typeof(byte),
+            GpType.Short or GpType.ShortZero => typeof(short),
+            GpType.Float or GpType.FloatZero => typeof(float),
+            GpType.Double or GpType.DoubleZero => typeof(double),
+            GpType.String => typeof(string),
+            GpType.CompressedInt or GpType.Int1 or GpType.Int1_ or GpType.Int2 or GpType.Int2_ or GpType.IntZero => typeof(int),
+            GpType.CompressedLong or GpType.L1 or GpType.L1_ or GpType.L2 or GpType.L2_ or GpType.LongZero => typeof(long),
+            _ => throw new Exception($"{gpType} is not a valid Type as Dictionary key.")
+        };
 
-    private static Type GetClrArrayType(Protocol18.GpType gpType)
-    {
-        switch (gpType)
-        {
-            case Protocol18.GpType.Boolean:
-            case Protocol18.GpType.BooleanFalse:
-            case Protocol18.GpType.BooleanTrue:
-                return typeof(bool);
-            case Protocol18.GpType.Byte:
-            case Protocol18.GpType.ByteZero:
-                return typeof(byte);
-            case Protocol18.GpType.Short:
-            case Protocol18.GpType.ShortZero:
-                return typeof(short);
-            case Protocol18.GpType.Float:
-            case Protocol18.GpType.FloatZero:
-                return typeof(float);
-            case Protocol18.GpType.Double:
-            case Protocol18.GpType.DoubleZero:
-                return typeof(double);
-            case Protocol18.GpType.String:
-                return typeof(string);
-            case Protocol18.GpType.CompressedInt:
-            case Protocol18.GpType.Int1:
-            case Protocol18.GpType.Int1_:
-            case Protocol18.GpType.Int2:
-            case Protocol18.GpType.Int2_:
-            case Protocol18.GpType.IntZero:
-                return typeof(int);
-            case Protocol18.GpType.CompressedLong:
-            case Protocol18.GpType.L1:
-            case Protocol18.GpType.L1_:
-            case Protocol18.GpType.L2:
-            case Protocol18.GpType.L2_:
-            case Protocol18.GpType.LongZero:
-                return typeof(long);
-            case Protocol18.GpType.Hashtable:
-                return typeof(Hashtable);
-            case Protocol18.GpType.OperationRequest:
-                return typeof(OperationRequest);
-            case Protocol18.GpType.OperationResponse:
-                return typeof(OperationResponse);
-            case Protocol18.GpType.EventData:
-                return typeof(EventData);
-            case Protocol18.GpType.BooleanArray:
-                return typeof(bool[]);
-            case Protocol18.GpType.ByteArray:
-                return typeof(byte[]);
-            case Protocol18.GpType.ShortArray:
-                return typeof(short[]);
-            case Protocol18.GpType.FloatArray:
-                return typeof(float[]);
-            case Protocol18.GpType.DoubleArray:
-                return typeof(double[]);
-            case Protocol18.GpType.StringArray:
-                return typeof(string[]);
-            case Protocol18.GpType.CompressedIntArray:
-                return typeof(int[]);
-            case Protocol18.GpType.CompressedLongArray:
-                return typeof(long[]);
-            case Protocol18.GpType.HashtableArray:
-                return typeof(Hashtable[]);
-            default:
-                return (Type)null;
-        }
-    }
+    private static Type? GetClrArrayType(GpType gpType) =>
+            gpType switch
+            {
+                GpType.Boolean or GpType.BooleanFalse or GpType.BooleanTrue => typeof(bool),
+                GpType.Byte or GpType.ByteZero => typeof(byte),
+                GpType.Short or GpType.ShortZero => typeof(short),
+                GpType.Float or GpType.FloatZero => typeof(float),
+                GpType.Double or GpType.DoubleZero => typeof(double),
+                GpType.String => typeof(string),
+                GpType.CompressedInt or GpType.Int1 or GpType.Int1_ or GpType.Int2 or GpType.Int2_ or GpType.IntZero => typeof(int),
+                GpType.CompressedLong or GpType.L1 or GpType.L1_ or GpType.L2 or GpType.L2_ or GpType.LongZero => typeof(long),
+                GpType.Hashtable => typeof(Hashtable),
+                GpType.OperationRequest => typeof(OperationRequest),
+                GpType.OperationResponse => typeof(OperationResponse),
+                GpType.EventData => typeof(EventData),
+                GpType.BooleanArray => typeof(bool[]),
+                GpType.ByteArray => typeof(byte[]),
+                GpType.ShortArray => typeof(short[]),
+                GpType.FloatArray => typeof(float[]),
+                GpType.DoubleArray => typeof(double[]),
+                GpType.StringArray => typeof(string[]),
+                GpType.CompressedIntArray => typeof(int[]),
+                GpType.CompressedLongArray => typeof(long[]),
+                GpType.HashtableArray => typeof(Hashtable[]),
+                _ => null
+            };
 
-    private Protocol18.GpType GetCodeOfType(Type type)
+    private GpType GetCodeOfType(Type type)
     {
-        if (type == (Type)null)
-            return Protocol18.GpType.Null;
+        if (type == null)
+            return GpType.Null;
         if (type == typeof(StructWrapper<>))
-            return Protocol18.GpType.Unknown;
+            return GpType.Unknown;
+
         if (type.IsPrimitive || type.IsEnum)
-            return this.GetCodeOfTypeCode(Type.GetTypeCode(type));
+            return GetCodeOfTypeCode(Type.GetTypeCode(type));
+
         if (type == typeof(string))
-            return Protocol18.GpType.String;
+            return GpType.String;
+
         if (type.IsArray)
         {
-            Type elementType = type.GetElementType();
-            if (elementType == (Type)null)
-                throw new InvalidDataException(string.Format("Arrays of type {0} are not supported", (object)type));
+            Type? elementType = type.GetElementType();
+            if (elementType == null)
+                throw new InvalidDataException($"Arrays of type {type} are not supported");
+
             if (elementType.IsPrimitive)
             {
-                switch (Type.GetTypeCode(elementType))
+                return Type.GetTypeCode(elementType) switch
                 {
-                    case TypeCode.Boolean:
-                        return Protocol18.GpType.BooleanArray;
-                    case TypeCode.Byte:
-                        return Protocol18.GpType.ByteArray;
-                    case TypeCode.Int16:
-                        return Protocol18.GpType.ShortArray;
-                    case TypeCode.Int32:
-                        return Protocol18.GpType.CompressedIntArray;
-                    case TypeCode.Int64:
-                        return Protocol18.GpType.CompressedLongArray;
-                    case TypeCode.Single:
-                        return Protocol18.GpType.FloatArray;
-                    case TypeCode.Double:
-                        return Protocol18.GpType.DoubleArray;
-                }
+                    TypeCode.Boolean => GpType.BooleanArray,
+                    TypeCode.Byte => GpType.ByteArray,
+                    TypeCode.Int16 => GpType.ShortArray,
+                    TypeCode.Int32 => GpType.CompressedIntArray,
+                    TypeCode.Int64 => GpType.CompressedLongArray,
+                    TypeCode.Single => GpType.FloatArray,
+                    TypeCode.Double => GpType.DoubleArray,
+                    _ => throw new InvalidDataException($"Primitive type {elementType} is not supported")
+                };
             }
+
             if (elementType.IsArray)
-                return Protocol18.GpType.Array;
+                return GpType.Array;
             if (elementType == typeof(string))
-                return Protocol18.GpType.StringArray;
+                return GpType.StringArray;
             if (elementType == typeof(object) || elementType == typeof(StructWrapper))
-                return Protocol18.GpType.ObjectArray;
+                return GpType.ObjectArray;
             if (elementType == typeof(Hashtable))
-                return Protocol18.GpType.HashtableArray;
-            return elementType.IsGenericType && typeof(Dictionary<,>) == elementType.GetGenericTypeDefinition() ? Protocol18.GpType.DictionaryArray : Protocol18.GpType.CustomTypeArray;
-        }
-        if (type == typeof(Hashtable))
-            return Protocol18.GpType.Hashtable;
-        if (type == typeof(List<object>))
-            return Protocol18.GpType.ObjectArray;
-        if (type.IsGenericType && typeof(Dictionary<,>) == type.GetGenericTypeDefinition())
-            return Protocol18.GpType.Dictionary;
-        if (type == typeof(EventData))
-            return Protocol18.GpType.EventData;
-        if (type == typeof(OperationRequest))
-            return Protocol18.GpType.OperationRequest;
-        return type == typeof(OperationResponse) ? Protocol18.GpType.OperationResponse : Protocol18.GpType.Unknown;
-    }
+                return GpType.HashtableArray;
 
-    private Protocol18.GpType GetCodeOfTypeCode(TypeCode type)
-    {
-        switch (type)
+            return elementType.IsGenericType && typeof(Dictionary<,>) == elementType.GetGenericTypeDefinition()
+                ? GpType.DictionaryArray
+                : GpType.CustomTypeArray;
+        }
+
+        return type switch
         {
-            case TypeCode.Boolean:
-                return Protocol18.GpType.Boolean;
-            case TypeCode.Byte:
-                return Protocol18.GpType.Byte;
-            case TypeCode.Int16:
-                return Protocol18.GpType.Short;
-            case TypeCode.Int32:
-                return Protocol18.GpType.CompressedInt;
-            case TypeCode.Int64:
-                return Protocol18.GpType.CompressedLong;
-            case TypeCode.Single:
-                return Protocol18.GpType.Float;
-            case TypeCode.Double:
-                return Protocol18.GpType.Double;
-            case TypeCode.String:
-                return Protocol18.GpType.String;
-            default:
-                return Protocol18.GpType.Unknown;
-        }
+            _ when type == typeof(Hashtable) => GpType.Hashtable,
+            _ when type == typeof(List<object>) => GpType.ObjectArray,
+            _ when type.IsGenericType && typeof(Dictionary<,>) == type.GetGenericTypeDefinition() => GpType.Dictionary,
+            _ when type == typeof(EventData) => GpType.EventData,
+            _ when type == typeof(OperationRequest) => GpType.OperationRequest,
+            _ when type == typeof(OperationResponse) => GpType.OperationResponse,
+            _ => GpType.Unknown
+        };
     }
 
-    private object Read(
-      StreamBuffer stream,
-      IProtocol.DeserializationFlags flags,
-      Dictionary<byte, object> parameters)
-    {
-        return this.Read(stream, this.ReadByte(stream), flags, parameters);
-    }
+    private GpType GetCodeOfTypeCode(TypeCode typeCode) =>
+        typeCode switch
+        {
+            TypeCode.Boolean => GpType.Boolean,
+            TypeCode.Byte => GpType.Byte,
+            TypeCode.Int16 => GpType.Short,
+            TypeCode.Int32 => GpType.CompressedInt,
+            TypeCode.Int64 => GpType.CompressedLong,
+            TypeCode.Single => GpType.Float,
+            TypeCode.Double => GpType.Double,
+            TypeCode.String => GpType.String,
+            _ => GpType.Unknown
+        };
 
-    private object Read(
-      StreamBuffer stream,
-      byte gpType,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None,
-      Dictionary<byte, object> parameters = null)
+    private object? Read(StreamBuffer stream, DeserializationFlags flags, Dictionary<byte, object?>? parameters) =>
+        Read(stream, ReadByte(stream), flags, parameters);
+
+    private object? Read(StreamBuffer stream, byte gpType, DeserializationFlags flags = DeserializationFlags.None, Dictionary<byte, object?>? parameters = null)
     {
-        int num1 = gpType >= (byte)128 ? (int)gpType - 128 : (int)gpType;
+        int num1 = gpType >= 128 ? gpType - 128 : gpType;
         int num2 = num1 >= 64 ? num1 - 64 : num1;
-        bool flag1 = (flags & IProtocol.DeserializationFlags.WrapIncomingStructs) == IProtocol.DeserializationFlags.WrapIncomingStructs;
-        if (gpType >= (byte)128 && gpType <= (byte)228)
-            return this.ReadCustomType(stream, gpType);
-        switch (gpType)
+        bool wrapIncomingStructs = (flags & DeserializationFlags.WrapIncomingStructs) == DeserializationFlags.WrapIncomingStructs;
+
+        if (gpType >= 128 && gpType <= 228)
+            return ReadCustomType(stream, gpType);
+
+        return gpType switch
         {
-            case 2:
-                bool flag2 = this.ReadBoolean(stream);
-                return flag1 ? (object)wrapperPools.Acquire(flag2) : (object)flag2;
-            case 3:
-                byte num3 = this.ReadByte(stream);
-                return flag1 ? (object)wrapperPools.Acquire(num3) : (object)num3;
-            case 4:
-                short num4 = this.ReadInt16(stream);
-                return flag1 ? (object)wrapperPools.Acquire<short>(num4) : (object)num4;
-            case 5:
-                float num5 = this.ReadSingle(stream);
-                return flag1 ? (object)wrapperPools.Acquire<float>(num5) : (object)num5;
-            case 6:
-                double num6 = this.ReadDouble(stream);
-                return flag1 ? (object)wrapperPools.Acquire<double>(num6) : (object)num6;
-            case 7:
-                return (object)this.ReadString(stream);
-            case 8:
-                return (object)null;
-            case 9:
-                int num7 = this.ReadCompressedInt32(stream);
-                return flag1 ? (object)wrapperPools.Acquire<int>(num7) : (object)num7;
-            case 10:
-                long num8 = this.ReadCompressedInt64(stream);
-                return flag1 ? (object)wrapperPools.Acquire<long>(num8) : (object)num8;
-            case 11:
-                int num9 = this.ReadInt1(stream, false);
-                return flag1 ? (object)wrapperPools.Acquire<int>(num9) : (object)num9;
-            case 12:
-                int num10 = this.ReadInt1(stream, true);
-                return flag1 ? (object)wrapperPools.Acquire<int>(num10) : (object)num10;
-            case 13:
-                int num11 = this.ReadInt2(stream, false);
-                return flag1 ? (object)wrapperPools.Acquire<int>(num11) : (object)num11;
-            case 14:
-                int num12 = this.ReadInt2(stream, true);
-                return flag1 ? (object)wrapperPools.Acquire<int>(num12) : (object)num12;
-            case 15:
-                long num13 = (long)this.ReadInt1(stream, false);
-                return flag1 ? (object)wrapperPools.Acquire<long>(num13) : (object)num13;
-            case 16:
-                long num14 = (long)this.ReadInt1(stream, true);
-                return flag1 ? (object)wrapperPools.Acquire<long>(num14) : (object)num14;
-            case 17:
-                long num15 = (long)this.ReadInt2(stream, false);
-                return flag1 ? (object)wrapperPools.Acquire<long>(num15) : (object)num15;
-            case 18:
-                long num16 = (long)this.ReadInt2(stream, true);
-                return flag1 ? (object)wrapperPools.Acquire<long>(num16) : (object)num16;
-            case 19:
-                return this.ReadCustomType(stream);
-            case 20:
-                return (object)this.ReadDictionary(stream, flags, parameters);
-            case 21:
-                return (object)this.ReadHashtable(stream, flags, parameters);
-            case 23:
-                return (object)this.ReadObjectArray(stream, flags, parameters);
-            case 24:
-                return (object)this.DeserializeOperationRequest(stream, IProtocol.DeserializationFlags.None);
-            case 25:
-                return (object)this.DeserializeOperationResponse(stream, flags);
-            case 26:
-                return (object)this.DeserializeEventData(stream, null, IProtocol.DeserializationFlags.None);
-            case 27:
-                bool flag3 = false;
-                return flag1 ? (object)wrapperPools.Acquire(flag3) : (object)flag3;
-            case 28:
-                bool flag4 = true;
-                return flag1 ? (object)wrapperPools.Acquire(flag4) : (object)flag4;
-            case 29:
-                short num17 = 0;
-                return flag1 ? (object)wrapperPools.Acquire<short>(num17) : (object)num17;
-            case 30:
-                int num18 = 0;
-                return flag1 ? (object)wrapperPools.Acquire<int>(num18) : (object)num18;
-            case 31:
-                long num19 = 0;
-                return flag1 ? (object)wrapperPools.Acquire<long>(num19) : (object)num19;
-            case 32:
-                float num20 = 0.0f;
-                return flag1 ? (object)wrapperPools.Acquire<float>(num20) : (object)num20;
-            case 33:
-                double num21 = 0.0;
-                return flag1 ? (object)wrapperPools.Acquire<double>(num21) : (object)num21;
-            case 34:
-                byte num22 = 0;
-                return flag1 ? (object)wrapperPools.Acquire(num22) : (object)num22;
-            case 64:
-                return (object)this.ReadArrayInArray(stream, flags, parameters);
-            case 66:
-                return (object)this.ReadBooleanArray(stream);
-            case 67:
-                return (object)this.ReadByteArray(stream);
-            case 68:
-                return (object)this.ReadInt16Array(stream);
-            case 69:
-                return (object)this.ReadSingleArray(stream);
-            case 70:
-                return (object)this.ReadDoubleArray(stream);
-            case 71:
-                return (object)this.ReadStringArray(stream);
-            case 73:
-                return (object)this.ReadCompressedInt32Array(stream);
-            case 74:
-                return (object)this.ReadCompressedInt64Array(stream);
-            case 83:
-                return this.ReadCustomTypeArray(stream);
-            case 84:
-                return (object)this.ReadDictionaryArray(stream, flags, parameters);
-            case 85:
-                return (object)this.ReadHashtableArray(stream, flags, parameters);
-            default:
-                throw new InvalidDataException(string.Format("GpTypeCode not found: {0}(0x{0:X}). Is not a CustomType either. Pos: {1} Available: {2}", (object)gpType, (object)stream.Position, (object)stream.Available));
-        }
+            2 => ReadBoolean(stream),
+            3 => ReadByte(stream),
+            4 => ReadInt16(stream),
+            5 => ReadSingle(stream),
+            6 => ReadDouble(stream),
+            7 => (object)ReadString(stream),
+            8 => null,
+            9 => ReadCompressedInt32(stream),
+            10 => ReadCompressedInt64(stream),
+            11 => ReadInt1(stream, false),
+            12 => ReadInt1(stream, true),
+            13 => ReadInt2(stream, false),
+            14 => ReadInt2(stream, true),
+            15 => (long)ReadInt1(stream, false),
+            16 => (long)ReadInt1(stream, true),
+            17 => (long)ReadInt2(stream, false),
+            18 => (long)ReadInt2(stream, true),
+            19 => ReadCustomType(stream),
+            20 => (object)ReadDictionary(stream, flags, parameters),
+            21 => (object)ReadHashtable(stream, flags, parameters),
+            23 => (object)ReadObjectArray(stream, flags, parameters),
+            24 => (object)DeserializeOperationRequest(stream, IProtocol.DeserializationFlags.None),
+            25 => (object)DeserializeOperationResponse(stream, flags),
+            26 => (object)DeserializeEventData(stream, null, IProtocol.DeserializationFlags.None),
+            27 => false,
+            28 => true,
+            29 => (short)0,
+            30 => 0,
+            31 => 0L,
+            32 => 0.0f,
+            33 => 0.0,
+            34 => (byte)0,
+            64 => (object)ReadArrayInArray(stream, flags, parameters),
+            66 => (object)ReadBooleanArray(stream),
+            67 => (object)ReadByteArray(stream),
+            68 => (object)ReadInt16Array(stream),
+            69 => (object)ReadSingleArray(stream),
+            70 => (object)ReadDoubleArray(stream),
+            71 => (object)ReadStringArray(stream),
+            73 => (object)ReadCompressedInt32Array(stream),
+            74 => (object)ReadCompressedInt64Array(stream),
+            83 => ReadCustomTypeArray(stream),
+            84 => (object)ReadDictionaryArray(stream, flags, parameters),
+            85 => (object)ReadHashtableArray(stream, flags, parameters),
+            _ => throw new InvalidDataException($"GpTypeCode not found: {gpType}(0x{gpType:X}). Is not a CustomType either. Pos: {stream.Position} Available: {stream.Available}")
+        };
     }
 
-    internal bool ReadBoolean(StreamBuffer stream) => stream.ReadByte() > (byte)0;
+    internal bool ReadBoolean(StreamBuffer stream) => stream.ReadByte() > 0;
 
     internal byte ReadByte(StreamBuffer stream) => stream.ReadByte();
 
     internal short ReadInt16(StreamBuffer stream)
     {
         int offset;
-        byte[] bufferAndAdvance = stream.GetBufferAndAdvance(2, out offset);
-        byte[] numArray = bufferAndAdvance;
-        int index1 = offset;
-        int index2 = index1 + 1;
-        return (short)((int)numArray[index1] | (int)bufferAndAdvance[index2] << 8);
+        byte[] buffer = stream.GetBufferAndAdvance(2, out offset);
+        return (short)(buffer[offset] | buffer[offset + 1] << 8);
     }
 
     internal ushort ReadUShort(StreamBuffer stream)
     {
         int offset;
-        byte[] bufferAndAdvance = stream.GetBufferAndAdvance(2, out offset);
-        byte[] numArray = bufferAndAdvance;
-        int index1 = offset;
-        int index2 = index1 + 1;
-        return (ushort)((uint)numArray[index1] | (uint)bufferAndAdvance[index2] << 8);
+        byte[] buffer = stream.GetBufferAndAdvance(2, out offset);
+        return (ushort)(buffer[offset] | buffer[offset + 1] << 8);
     }
 
     internal int ReadInt32(StreamBuffer stream)
     {
         int offset;
-        byte[] bufferAndAdvance = stream.GetBufferAndAdvance(4, out offset);
-        byte[] numArray1 = bufferAndAdvance;
-        int index1 = offset;
-        int num1 = index1 + 1;
-        int num2 = (int)numArray1[index1] << 24;
-        byte[] numArray2 = bufferAndAdvance;
-        int index2 = num1;
-        int num3 = index2 + 1;
-        int num4 = (int)numArray2[index2] << 16;
-        int num5 = num2 | num4;
-        byte[] numArray3 = bufferAndAdvance;
-        int index3 = num3;
-        int index4 = index3 + 1;
-        int num6 = (int)numArray3[index3] << 8;
-        return num5 | num6 | (int)bufferAndAdvance[index4];
+        byte[] buffer = stream.GetBufferAndAdvance(4, out offset);
+        return buffer[offset] << 24 | buffer[offset + 1] << 16 | buffer[offset + 2] << 8 | buffer[offset + 3];
     }
 
     internal long ReadInt64(StreamBuffer stream)
     {
         int offset;
-        byte[] bufferAndAdvance = stream.GetBufferAndAdvance(4, out offset);
-        byte[] numArray1 = bufferAndAdvance;
-        int index1 = offset;
-        int num1 = index1 + 1;
-        long num2 = (long)numArray1[index1] << 56;
-        byte[] numArray2 = bufferAndAdvance;
-        int index2 = num1;
-        int num3 = index2 + 1;
-        long num4 = (long)numArray2[index2] << 48;
-        long num5 = num2 | num4;
-        byte[] numArray3 = bufferAndAdvance;
-        int index3 = num3;
-        int num6 = index3 + 1;
-        long num7 = (long)numArray3[index3] << 40;
-        long num8 = num5 | num7;
-        byte[] numArray4 = bufferAndAdvance;
-        int index4 = num6;
-        int num9 = index4 + 1;
-        long num10 = (long)numArray4[index4] << 32;
-        long num11 = num8 | num10;
-        byte[] numArray5 = bufferAndAdvance;
-        int index5 = num9;
-        int num12 = index5 + 1;
-        long num13 = (long)numArray5[index5] << 24;
-        long num14 = num11 | num13;
-        byte[] numArray6 = bufferAndAdvance;
-        int index6 = num12;
-        int num15 = index6 + 1;
-        long num16 = (long)numArray6[index6] << 16;
-        long num17 = num14 | num16;
-        byte[] numArray7 = bufferAndAdvance;
-        int index7 = num15;
-        int index8 = index7 + 1;
-        long num18 = (long)numArray7[index7] << 8;
-        return num17 | num18 | (long)bufferAndAdvance[index8];
+        byte[] buffer = stream.GetBufferAndAdvance(8, out offset);
+        return (long)buffer[offset] << 56 | (long)buffer[offset + 1] << 48 | (long)buffer[offset + 2] << 40 | (long)buffer[offset + 3] << 32 |
+               (long)buffer[offset + 4] << 24 | (long)buffer[offset + 5] << 16 | (long)buffer[offset + 6] << 8 | buffer[offset + 7];
     }
 
     internal float ReadSingle(StreamBuffer stream)
@@ -489,180 +267,154 @@ public class Protocol18 : IProtocol
 
     internal ByteArraySlice ReadNonAllocByteArray(StreamBuffer stream)
     {
-        uint num = this.ReadCompressedUInt32(stream);
-        ByteArraySlice byteArraySlice = this.ByteArraySlicePool.Acquire((int)num);
-        stream.Read(byteArraySlice.Buffer, 0, (int)num);
-        byteArraySlice.Count = (int)num;
+        uint length = ReadCompressedUInt32(stream);
+        ByteArraySlice byteArraySlice = ByteArraySlicePool.Acquire((int)length);
+        stream.Read(byteArraySlice.Buffer!, 0, (int)length);
+        byteArraySlice.Count = (int)length;
         return byteArraySlice;
     }
 
     internal byte[] ReadByteArray(StreamBuffer stream)
     {
-        uint count = this.ReadCompressedUInt32(stream);
-        byte[] buffer = new byte[(int)count];
-        stream.Read(buffer, 0, (int)count);
+        uint length = ReadCompressedUInt32(stream);
+        byte[] buffer = new byte[length];
+        stream.Read(buffer, 0, (int)length);
         return buffer;
     }
 
     public object ReadCustomType(StreamBuffer stream, byte gpType = 0)
     {
-        byte key = gpType != (byte)0 ? (byte)((uint)gpType - 128U) : stream.ReadByte();
-        int length = (int)this.ReadCompressedUInt32(stream);
+        byte typeCode = gpType != 0 ? (byte)(gpType - 128) : stream.ReadByte();
+        int length = (int)ReadCompressedUInt32(stream);
         if (length < 0)
-            throw new InvalidDataException("ReadCustomType read negative size value: " + length.ToString() + " before position: " + stream.Position.ToString());
-        bool flag = length <= stream.Available;
-        CustomType? customType;
-        if (!flag || length > (int)short.MaxValue || !Protocol.CodeDict.TryGetValue(key, out customType))
+            throw new InvalidDataException($"ReadCustomType read negative size value: {length} before position: {stream.Position}");
+
+        if (length > stream.Available || length > short.MaxValue || !Protocol.CodeDict.TryGetValue(typeCode, out CustomType? customType))
         {
-            UnknownType unknownType = new UnknownType()
-            {
-                TypeCode = key,
-                Size = length
-            };
-            int count = flag ? length : stream.Available;
+            UnknownType unknownType = new UnknownType { TypeCode = typeCode, Size = length };
+            int count = length > stream.Available ? stream.Available : length;
             if (count > 0)
             {
                 byte[] buffer = new byte[count];
                 stream.Read(buffer, 0, count);
                 unknownType.Data = buffer;
             }
-            return (object)unknownType;
+            return unknownType;
         }
-        if (customType.DeserializeStreamFunction == null)
+
+        if (customType.DeserializeFunction != null)
         {
-            byte[] numArray = new byte[length];
-            stream.Read(numArray, 0, length);
-            return customType.DeserializeFunction(numArray);
+            byte[] buffer = new byte[length];
+            stream.Read(buffer, 0, length);
+            return customType.DeserializeFunction(buffer);
         }
-        int position = stream.Position;
-        object obj = customType.DeserializeStreamFunction(stream, (short)length);
-        if (stream.Position - position != length)
-            stream.Position = position + length;
-        return obj;
+
+        int startPosition = stream.Position;
+        object result = customType.DeserializeStreamFunction!(stream, (short)length);
+        if (stream.Position - startPosition != length)
+            stream.Position = startPosition + length;
+
+        return result;
     }
 
-    public override EventData DeserializeEventData(
-      StreamBuffer din,
-      EventData? target = null,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+
+    public override EventData DeserializeEventData(StreamBuffer din, EventData? target = null, DeserializationFlags flags = DeserializationFlags.None)
     {
-        EventData eventData;
-        if (target != null)
-        {
-            target.Reset();
-            eventData = target;
-        }
-        else
-            eventData = new EventData();
-        eventData.Code = this.ReadByte(din);
-        short num = (short)this.ReadByte(din);
-        bool flag = (flags & IProtocol.DeserializationFlags.AllowPooledByteArray) == IProtocol.DeserializationFlags.AllowPooledByteArray;
-        for (uint index = 0; (long)index < (long)num; ++index)
+        EventData eventData = target ?? new EventData();
+        eventData.Code = ReadByte(din);
+        short parameterCount = (short)ReadByte(din);
+        bool allowPooledByteArray = (flags & DeserializationFlags.AllowPooledByteArray) == DeserializationFlags.AllowPooledByteArray;
+
+        for (uint i = 0; i < parameterCount; i++)
         {
             byte code = din.ReadByte();
             byte gpType = din.ReadByte();
-            object obj;
-            if (!flag)
-                obj = this.Read(din, gpType, flags, eventData.Parameters);
-            else if (gpType == (byte)67)
-                obj = (object)this.ReadNonAllocByteArray(din);
-            else if ((int)code == (int)eventData.SenderKey)
+            object? value;
+            if (!allowPooledByteArray)
             {
-                switch ((Protocol18.GpType)gpType)
+                value = Read(din, gpType, flags, eventData.Parameters);
+            }
+            else if (gpType == 67)
+            {
+                value = ReadNonAllocByteArray(din);
+            }
+            else if (code == eventData.SenderKey)
+            {
+                value = gpType switch
                 {
-                    case Protocol18.GpType.CompressedInt:
-                        eventData.Sender = this.ReadCompressedInt32(din);
-                        continue;
-                    case Protocol18.GpType.Int1:
-                        eventData.Sender = this.ReadInt1(din, false);
-                        continue;
-                    case Protocol18.GpType.Int1_:
-                        eventData.Sender = this.ReadInt1(din, true);
-                        continue;
-                    case Protocol18.GpType.Int2:
-                        eventData.Sender = this.ReadInt2(din, false);
-                        continue;
-                    case Protocol18.GpType.Int2_:
-                        eventData.Sender = this.ReadInt2(din, true);
-                        continue;
-                    case Protocol18.GpType.IntZero:
-                        eventData.Sender = 0;
-                        continue;
-                    default:
-                        continue;
-                }
+                    9 => ReadCompressedInt32(din),
+                    11 => ReadInt1(din, false),
+                    12 => ReadInt1(din, true),
+                    13 => ReadInt2(din, false),
+                    14 => ReadInt2(din, true),
+                    30 => 0,
+                    _ => throw new InvalidDataException($"Unsupported GpType: {gpType}")
+                };
+
+                eventData.Sender = (int)value;
+                continue;
             }
             else
-                obj = this.Read(din, gpType, flags, eventData.Parameters);
-            eventData.Parameters.Add(code, obj);
+            {
+                value = Read(din, gpType, flags, eventData.Parameters);
+            }
+
+            eventData.Parameters.Add(code, value);
         }
+
         return eventData;
     }
 
-    [Obsolete("Use Dictionary<byte, object> instead.")]
-    private Dictionary<byte, object> ReadParameterTable(
+    private Dictionary<byte, object?> ReadParameters(
       StreamBuffer stream,
-      Dictionary<byte, object> target = null,
+      Dictionary<byte, object?>? target = null,
       IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
     {
-        short capacity = (short)this.ReadByte(stream);
-        Dictionary<byte, object> dictionary = target != null ? target : new Dictionary<byte, object>((int)capacity);
-        for (uint index = 0; (long)index < (long)capacity; ++index)
-        {
-            byte key = stream.ReadByte();
-            byte gpType = stream.ReadByte();
-            object obj = gpType != (byte)67 || (flags & IProtocol.DeserializationFlags.AllowPooledByteArray) != IProtocol.DeserializationFlags.AllowPooledByteArray ? this.Read(stream, gpType, flags) : (object)this.ReadNonAllocByteArray(stream);
-            dictionary[key] = obj;
-        }
-        return dictionary;
-    }
+        short capacity = (short)ReadByte(stream);
+        Dictionary<byte, object?> parameters = target ?? new Dictionary<byte, object?>(capacity);
+        bool allowPooledByteArray = (flags & IProtocol.DeserializationFlags.AllowPooledByteArray) == IProtocol.DeserializationFlags.AllowPooledByteArray;
 
-    private Dictionary<byte, object> ReadParameters(
-      StreamBuffer stream,
-      Dictionary<byte, object> target = null,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
-    {
-        short capacity = (short)this.ReadByte(stream);
-        Dictionary<byte, object> parameters = target != null ? target : new((int)capacity);
-        bool flag = (flags & IProtocol.DeserializationFlags.AllowPooledByteArray) == IProtocol.DeserializationFlags.AllowPooledByteArray;
-        for (uint index = 0; (long)index < (long)capacity; ++index)
+        for (uint i = 0; i < capacity; i++)
         {
             byte code = stream.ReadByte();
             byte gpType = stream.ReadByte();
-            object obj = !flag || gpType != (byte)67 ? this.Read(stream, gpType, flags, parameters) : (object)this.ReadNonAllocByteArray(stream);
-            parameters.Add(code, obj);
+            object? value = allowPooledByteArray && gpType == 67
+                ? ReadNonAllocByteArray(stream)
+                : Read(stream, gpType, flags, parameters);
+            parameters.Add(code, value);
         }
+
         return parameters;
     }
 
     public Hashtable ReadHashtable(
       StreamBuffer stream,
-      IProtocol.DeserializationFlags flags,
-      Dictionary<byte, object> parameters)
+      DeserializationFlags flags,
+      Dictionary<byte, object?>? parameters)
     {
-        int x = (int)this.ReadCompressedUInt32(stream);
-        Hashtable hashtable = new Hashtable(x);
-        for (uint index = 0; (long)index < (long)x; ++index)
+        int count = (int)ReadCompressedUInt32(stream);
+        Hashtable hashtable = new Hashtable(count);
+
+        for (uint i = 0; i < count; i++)
         {
-            object key = this.Read(stream, flags, parameters);
-            object obj = this.Read(stream, flags, parameters);
-            if (key != null)
-            {
-                if (!(key is StructWrapper<byte> structWrapper))
-                    hashtable[key] = obj;
-                else
-                    hashtable[structWrapper.Unwrap<byte>()] = obj;
-            }
+            object? key = Read(stream, flags, parameters);
+            object? value = Read(stream, flags, parameters);
+            if (key == null)
+                continue;
+            if (key is StructWrapper<byte> structWrapper)
+                hashtable[structWrapper.Unwrap<byte>()] = value;
+            else
+                hashtable[key] = value;
         }
         return hashtable;
     }
 
     public int[] ReadIntArray(StreamBuffer stream)
     {
-        int length = this.ReadInt32(stream);
+        int length = ReadInt32(stream);
         int[] numArray = new int[length];
         for (uint index = 0; (long)index < (long)length; ++index)
-            numArray[(int)index] = this.ReadInt32(stream);
+            numArray[(int)index] = ReadInt32(stream);
         return numArray;
     }
 
@@ -672,9 +424,9 @@ public class Protocol18 : IProtocol
     {
         OperationRequest operationRequest = new OperationRequest()
         {
-            OperationCode = this.ReadByte(din)
+            OperationCode = ReadByte(din)
         };
-        operationRequest.Parameters = this.ReadParameters(din, operationRequest.Parameters, flags);
+        operationRequest.Parameters = ReadParameters(din, operationRequest.Parameters, flags);
         return operationRequest;
     }
 
@@ -684,11 +436,11 @@ public class Protocol18 : IProtocol
     {
         OperationResponse operationResponse = new OperationResponse()
         {
-            OperationCode = this.ReadByte(stream),
-            ReturnCode = this.ReadInt16(stream)
+            OperationCode = ReadByte(stream),
+            ReturnCode = ReadInt16(stream)
         };
-        operationResponse.DebugMessage = this.Read(stream, this.ReadByte(stream), flags, operationResponse.Parameters) as string;
-        operationResponse.Parameters = this.ReadParameters(stream, operationResponse.Parameters, flags);
+        operationResponse.DebugMessage = Read(stream, ReadByte(stream), flags, operationResponse.Parameters) as string;
+        operationResponse.Parameters = ReadParameters(stream, operationResponse.Parameters, flags);
         return operationResponse;
     }
 
@@ -696,15 +448,15 @@ public class Protocol18 : IProtocol
     {
         return new DisconnectMessage()
         {
-            Code = this.ReadInt16(stream),
-            DebugMessage = this.Read(stream, this.ReadByte(stream)) as string,
-            Parameters = this.ReadParameterTable(stream)
+            Code = ReadInt16(stream),
+            DebugMessage = Read(stream, ReadByte(stream)) as string,
+            Parameters = ReadParameters(stream)
         };
     }
 
     internal string ReadString(StreamBuffer stream)
     {
-        int num = (int)this.ReadCompressedUInt32(stream);
+        int num = (int)ReadCompressedUInt32(stream);
         if (num == 0)
             return string.Empty;
         int offset = 0;
@@ -713,7 +465,7 @@ public class Protocol18 : IProtocol
 
     private object ReadCustomTypeArray(StreamBuffer stream)
     {
-        uint length1 = this.ReadCompressedUInt32(stream);
+        uint length1 = ReadCompressedUInt32(stream);
         byte key = stream.ReadByte();
         CustomType customType;
         if (!Protocol.CodeDict.TryGetValue(key, out customType))
@@ -721,7 +473,7 @@ public class Protocol18 : IProtocol
             int position = stream.Position;
             for (uint index = 0; index < length1; ++index)
             {
-                int num1 = (int)this.ReadCompressedUInt32(stream);
+                int num1 = (int)ReadCompressedUInt32(stream);
                 int available = stream.Available;
                 int num2 = num1 > available ? available : num1;
                 stream.Position += num2;
@@ -738,7 +490,7 @@ public class Protocol18 : IProtocol
         Array instance = Array.CreateInstance(customType.Type, (int)length1);
         for (uint index = 0; index < length1; ++index)
         {
-            int length2 = (int)this.ReadCompressedUInt32(stream);
+            int length2 = (int)ReadCompressedUInt32(stream);
             if (length2 < 0)
                 throw new InvalidDataException("ReadCustomTypeArray read negative size value: " + length2.ToString() + " before position: " + stream.Position.ToString());
             if (length2 > stream.Available || length2 > (int)short.MaxValue)
@@ -782,13 +534,13 @@ public class Protocol18 : IProtocol
                 type2 = typeof(object);
                 break;
             case Protocol18.GpType.Dictionary:
-                type2 = this.ReadDictionaryType(stream);
+                type2 = ReadDictionaryType(stream);
                 break;
             case Protocol18.GpType.ObjectArray:
                 type2 = typeof(object[]);
                 break;
             case Protocol18.GpType.Array:
-                type2 = this.GetDictArrayType(stream);
+                type2 = GetDictArrayType(stream);
                 valueReadType = Protocol18.GpType.Unknown;
                 break;
             case Protocol18.GpType.HashtableArray:
@@ -813,10 +565,10 @@ public class Protocol18 : IProtocol
                 type2 = typeof(object);
                 break;
             case Protocol18.GpType.Dictionary:
-                type2 = this.ReadDictionaryType(stream);
+                type2 = ReadDictionaryType(stream);
                 break;
             case Protocol18.GpType.Array:
-                type2 = this.GetDictArrayType(stream);
+                type2 = GetDictArrayType(stream);
                 break;
             default:
                 type2 = Protocol18.GetClrArrayType(gpType2);
@@ -844,10 +596,10 @@ public class Protocol18 : IProtocol
     {
         Protocol18.GpType keyReadType;
         Protocol18.GpType valueReadType;
-        Type type = this.ReadDictionaryType(stream, out keyReadType, out valueReadType);
+        Type type = ReadDictionaryType(stream, out keyReadType, out valueReadType);
         if (type == (Type)null || !(Activator.CreateInstance(type) is IDictionary instance))
             return (IDictionary)null;
-        this.ReadDictionaryElements(stream, keyReadType, valueReadType, instance, flags, parameters);
+        ReadDictionaryElements(stream, keyReadType, valueReadType, instance, flags, parameters);
         return instance;
     }
 
@@ -859,11 +611,11 @@ public class Protocol18 : IProtocol
       IProtocol.DeserializationFlags flags,
       Dictionary<byte, object> parameters)
     {
-        uint num = this.ReadCompressedUInt32(stream);
+        uint num = ReadCompressedUInt32(stream);
         for (uint index = 0; index < num; ++index)
         {
-            object key = keyReadType == Protocol18.GpType.Unknown ? this.Read(stream, flags, parameters) : this.Read(stream, (byte)keyReadType);
-            object obj = valueReadType == Protocol18.GpType.Unknown ? this.Read(stream, flags, parameters) : this.Read(stream, (byte)valueReadType);
+            object key = keyReadType == Protocol18.GpType.Unknown ? Read(stream, flags, parameters) : Read(stream, (byte)keyReadType);
+            object obj = valueReadType == Protocol18.GpType.Unknown ? Read(stream, flags, parameters) : Read(stream, (byte)valueReadType);
             if (key != null)
                 dictionary.Add(key, obj);
         }
@@ -875,11 +627,11 @@ public class Protocol18 : IProtocol
       IProtocol.DeserializationFlags flags,
       Dictionary<byte, object> parameters)
     {
-        uint length = this.ReadCompressedUInt32(stream);
+        uint length = ReadCompressedUInt32(stream);
         object[] objArray = new object[(int)length];
         for (uint index = 0; index < length; ++index)
         {
-            object obj = this.Read(stream, flags, parameters);
+            object obj = Read(stream, flags, parameters);
             objArray[(int)index] = obj;
         }
         return objArray;
@@ -890,11 +642,11 @@ public class Protocol18 : IProtocol
       IProtocol.DeserializationFlags flags,
       Dictionary<byte, object> parameters)
     {
-        uint length = this.ReadCompressedUInt32(stream);
+        uint length = ReadCompressedUInt32(stream);
         StructWrapper[] structWrapperArray = new StructWrapper[(int)length];
         for (uint index = 0; index < length; ++index)
         {
-            object obj = this.Read(stream, flags, parameters);
+            object obj = Read(stream, flags, parameters);
             structWrapperArray[(int)index] = obj as StructWrapper;
             if (obj == null)
                 Log.Debug("Error: ReadWrapperArray hit null");
@@ -906,7 +658,7 @@ public class Protocol18 : IProtocol
 
     private bool[] ReadBooleanArray(StreamBuffer stream)
     {
-        uint length = this.ReadCompressedUInt32(stream);
+        uint length = ReadCompressedUInt32(stream);
         bool[] flagArray1 = new bool[(int)length];
         int num1 = (int)length / 8;
         int num2 = 0;
@@ -969,15 +721,15 @@ public class Protocol18 : IProtocol
 
     internal short[] ReadInt16Array(StreamBuffer stream)
     {
-        short[] numArray = new short[(int)this.ReadCompressedUInt32(stream)];
+        short[] numArray = new short[(int)ReadCompressedUInt32(stream)];
         for (uint index = 0; (long)index < (long)numArray.Length; ++index)
-            numArray[(int)index] = this.ReadInt16(stream);
+            numArray[(int)index] = ReadInt16(stream);
         return numArray;
     }
 
     private float[] ReadSingleArray(StreamBuffer stream)
     {
-        int length = (int)this.ReadCompressedUInt32(stream);
+        int length = (int)ReadCompressedUInt32(stream);
         int num = length * 4;
         float[] dst = new float[length];
         int offset;
@@ -987,7 +739,7 @@ public class Protocol18 : IProtocol
 
     private double[] ReadDoubleArray(StreamBuffer stream)
     {
-        int length = (int)this.ReadCompressedUInt32(stream);
+        int length = (int)ReadCompressedUInt32(stream);
         int num = length * 8;
         double[] dst = new double[length];
         int offset;
@@ -997,9 +749,9 @@ public class Protocol18 : IProtocol
 
     internal string[] ReadStringArray(StreamBuffer stream)
     {
-        string[] strArray = new string[(int)this.ReadCompressedUInt32(stream)];
+        string[] strArray = new string[(int)ReadCompressedUInt32(stream)];
         for (uint index = 0; (long)index < (long)strArray.Length; ++index)
-            strArray[(int)index] = this.ReadString(stream);
+            strArray[(int)index] = ReadString(stream);
         return strArray;
     }
 
@@ -1008,10 +760,10 @@ public class Protocol18 : IProtocol
       IProtocol.DeserializationFlags flags,
       Dictionary<byte, object> parameters)
     {
-        uint length = this.ReadCompressedUInt32(stream);
+        uint length = ReadCompressedUInt32(stream);
         Hashtable[] hashtableArray = new Hashtable[(int)length];
         for (uint index = 0; index < length; ++index)
-            hashtableArray[(int)index] = this.ReadHashtable(stream, flags, parameters);
+            hashtableArray[(int)index] = ReadHashtable(stream, flags, parameters);
         return hashtableArray;
     }
 
@@ -1022,13 +774,13 @@ public class Protocol18 : IProtocol
     {
         Protocol18.GpType keyReadType;
         Protocol18.GpType valueReadType;
-        Type type = this.ReadDictionaryType(stream, out keyReadType, out valueReadType);
-        uint length = this.ReadCompressedUInt32(stream);
+        Type type = ReadDictionaryType(stream, out keyReadType, out valueReadType);
+        uint length = ReadCompressedUInt32(stream);
         IDictionary[] instance = (IDictionary[])Array.CreateInstance(type, (int)length);
         for (uint index = 0; index < length; ++index)
         {
             instance[(int)index] = (IDictionary)Activator.CreateInstance(type);
-            this.ReadDictionaryElements(stream, keyReadType, valueReadType, instance[(int)index], flags, parameters);
+            ReadDictionaryElements(stream, keyReadType, valueReadType, instance[(int)index], flags, parameters);
         }
         return instance;
     }
@@ -1038,12 +790,12 @@ public class Protocol18 : IProtocol
       IProtocol.DeserializationFlags flags,
       Dictionary<byte, object> parameters)
     {
-        uint length = this.ReadCompressedUInt32(stream);
+        uint length = ReadCompressedUInt32(stream);
         Array array1 = (Array)null;
         Type elementType = (Type)null;
         for (uint index = 0; index < length; ++index)
         {
-            if (this.Read(stream, flags, parameters) is Array array2)
+            if (Read(stream, flags, parameters) is Array array2)
             {
                 if (array1 == null)
                 {
@@ -1064,12 +816,12 @@ public class Protocol18 : IProtocol
 
     internal int ReadInt2(StreamBuffer stream, bool signNegative)
     {
-        return signNegative ? (int)-this.ReadUShort(stream) : (int)this.ReadUShort(stream);
+        return signNegative ? (int)-ReadUShort(stream) : (int)ReadUShort(stream);
     }
 
     internal int ReadCompressedInt32(StreamBuffer stream)
     {
-        return this.DecodeZigZag32(this.ReadCompressedUInt32(stream));
+        return DecodeZigZag32(ReadCompressedUInt32(stream));
     }
 
     private uint ReadCompressedUInt32(StreamBuffer stream)
@@ -1110,7 +862,7 @@ public class Protocol18 : IProtocol
 
     internal long ReadCompressedInt64(StreamBuffer stream)
     {
-        return this.DecodeZigZag64(this.ReadCompressedUInt64(stream));
+        return DecodeZigZag64(ReadCompressedUInt64(stream));
     }
 
     private ulong ReadCompressedUInt64(StreamBuffer stream)
@@ -1136,17 +888,17 @@ public class Protocol18 : IProtocol
 
     internal int[] ReadCompressedInt32Array(StreamBuffer stream)
     {
-        int[] numArray = new int[(int)this.ReadCompressedUInt32(stream)];
+        int[] numArray = new int[(int)ReadCompressedUInt32(stream)];
         for (uint index = 0; (long)index < (long)numArray.Length; ++index)
-            numArray[(int)index] = this.ReadCompressedInt32(stream);
+            numArray[(int)index] = ReadCompressedInt32(stream);
         return numArray;
     }
 
     internal long[] ReadCompressedInt64Array(StreamBuffer stream)
     {
-        long[] numArray = new long[(int)this.ReadCompressedUInt32(stream)];
+        long[] numArray = new long[(int)ReadCompressedUInt32(stream)];
         for (uint index = 0; (long)index < (long)numArray.Length; ++index)
-            numArray[(int)index] = this.ReadCompressedInt64(stream);
+            numArray[(int)index] = ReadCompressedInt64(stream);
         return numArray;
     }
 
@@ -1157,9 +909,9 @@ public class Protocol18 : IProtocol
     internal void Write(StreamBuffer stream, object value, bool writeType)
     {
         if (value == null)
-            this.Write(stream, value, Protocol18.GpType.Null, writeType);
+            Write(stream, value, Protocol18.GpType.Null, writeType);
         else
-            this.Write(stream, value, this.GetCodeOfType(value.GetType()), writeType);
+            Write(stream, value, GetCodeOfType(value.GetType()), writeType);
     }
 
     private void Write(
@@ -1175,59 +927,59 @@ public class Protocol18 : IProtocol
                 {
                     case ByteArraySlice _:
                         ByteArraySlice buffer = (ByteArraySlice)value;
-                        this.WriteByteArraySlice(stream, buffer, writeType);
+                        WriteByteArraySlice(stream, buffer, writeType);
                         return;
                     case ArraySegment<byte> seg:
-                        this.WriteArraySegmentByte(stream, seg, writeType);
+                        WriteArraySegmentByte(stream, seg, writeType);
                         return;
                     case StructWrapper structWrapper:
                         switch (structWrapper.wrappedType)
                         {
                             case WrappedType.Bool:
-                                this.WriteBoolean(stream, value.Get<bool>(), writeType);
+                                WriteBoolean(stream, value.Get<bool>(), writeType);
                                 return;
                             case WrappedType.Byte:
-                                this.WriteByte(stream, value.Get<byte>(), writeType);
+                                WriteByte(stream, value.Get<byte>(), writeType);
                                 return;
                             case WrappedType.Int16:
-                                this.WriteInt16(stream, value.Get<short>(), writeType);
+                                WriteInt16(stream, value.Get<short>(), writeType);
                                 return;
                             case WrappedType.Int32:
-                                this.WriteCompressedInt32(stream, value.Get<int>(), writeType);
+                                WriteCompressedInt32(stream, value.Get<int>(), writeType);
                                 return;
                             case WrappedType.Int64:
-                                this.WriteCompressedInt64(stream, value.Get<long>(), writeType);
+                                WriteCompressedInt64(stream, value.Get<long>(), writeType);
                                 return;
                             case WrappedType.Single:
-                                this.WriteSingle(stream, value.Get<float>(), writeType);
+                                WriteSingle(stream, value.Get<float>(), writeType);
                                 return;
                             case WrappedType.Double:
-                                this.WriteDouble(stream, value.Get<double>(), writeType);
+                                WriteDouble(stream, value.Get<double>(), writeType);
                                 return;
                             default:
-                                this.WriteCustomType(stream, value, writeType);
+                                WriteCustomType(stream, value, writeType);
                                 return;
                         }
                     default:
                         goto label_18;
                 }
             case Protocol18.GpType.Boolean:
-                this.WriteBoolean(stream, (bool)value, writeType);
+                WriteBoolean(stream, (bool)value, writeType);
                 break;
             case Protocol18.GpType.Byte:
-                this.WriteByte(stream, (byte)value, writeType);
+                WriteByte(stream, (byte)value, writeType);
                 break;
             case Protocol18.GpType.Short:
-                this.WriteInt16(stream, (short)value, writeType);
+                WriteInt16(stream, (short)value, writeType);
                 break;
             case Protocol18.GpType.Float:
-                this.WriteSingle(stream, (float)value, writeType);
+                WriteSingle(stream, (float)value, writeType);
                 break;
             case Protocol18.GpType.Double:
-                this.WriteDouble(stream, (double)value, writeType);
+                WriteDouble(stream, (double)value, writeType);
                 break;
             case Protocol18.GpType.String:
-                this.WriteString(stream, (string)value, writeType);
+                WriteString(stream, (string)value, writeType);
                 break;
             case Protocol18.GpType.Null:
                 if (!writeType)
@@ -1235,68 +987,68 @@ public class Protocol18 : IProtocol
                 stream.WriteByte((byte)8);
                 break;
             case Protocol18.GpType.CompressedInt:
-                this.WriteCompressedInt32(stream, (int)value, writeType);
+                WriteCompressedInt32(stream, (int)value, writeType);
                 break;
             case Protocol18.GpType.CompressedLong:
-                this.WriteCompressedInt64(stream, (long)value, writeType);
+                WriteCompressedInt64(stream, (long)value, writeType);
                 break;
             case Protocol18.GpType.Custom:
             label_18:
-                this.WriteCustomType(stream, value, writeType);
+                WriteCustomType(stream, value, writeType);
                 break;
             case Protocol18.GpType.Dictionary:
-                this.WriteDictionary(stream, (object)(IDictionary)value, writeType);
+                WriteDictionary(stream, (object)(IDictionary)value, writeType);
                 break;
             case Protocol18.GpType.Hashtable:
-                this.WriteHashtable(stream, (object)(Hashtable)value, writeType);
+                WriteHashtable(stream, (object)(Hashtable)value, writeType);
                 break;
             case Protocol18.GpType.ObjectArray:
-                this.WriteObjectArray(stream, (IList)value, writeType);
+                WriteObjectArray(stream, (IList)value, writeType);
                 break;
             case Protocol18.GpType.OperationRequest:
-                this.SerializeOperationRequest(stream, (OperationRequest)value, writeType);
+                SerializeOperationRequest(stream, (OperationRequest)value, writeType);
                 break;
             case Protocol18.GpType.OperationResponse:
-                this.SerializeOperationResponse(stream, (OperationResponse)value, writeType);
+                SerializeOperationResponse(stream, (OperationResponse)value, writeType);
                 break;
             case Protocol18.GpType.EventData:
-                this.SerializeEventData(stream, (EventData)value, writeType);
+                SerializeEventData(stream, (EventData)value, writeType);
                 break;
             case Protocol18.GpType.Array:
-                this.WriteArrayInArray(stream, value, writeType);
+                WriteArrayInArray(stream, value, writeType);
                 break;
             case Protocol18.GpType.BooleanArray:
-                this.WriteBoolArray(stream, (bool[])value, writeType);
+                WriteBoolArray(stream, (bool[])value, writeType);
                 break;
             case Protocol18.GpType.ByteArray:
-                this.WriteByteArray(stream, (byte[])value, writeType);
+                WriteByteArray(stream, (byte[])value, writeType);
                 break;
             case Protocol18.GpType.ShortArray:
-                this.WriteInt16Array(stream, (short[])value, writeType);
+                WriteInt16Array(stream, (short[])value, writeType);
                 break;
             case Protocol18.GpType.FloatArray:
-                this.WriteSingleArray(stream, (float[])value, writeType);
+                WriteSingleArray(stream, (float[])value, writeType);
                 break;
             case Protocol18.GpType.DoubleArray:
-                this.WriteDoubleArray(stream, (double[])value, writeType);
+                WriteDoubleArray(stream, (double[])value, writeType);
                 break;
             case Protocol18.GpType.StringArray:
-                this.WriteStringArray(stream, value, writeType);
+                WriteStringArray(stream, value, writeType);
                 break;
             case Protocol18.GpType.CompressedIntArray:
-                this.WriteInt32ArrayCompressed(stream, (int[])value, writeType);
+                WriteInt32ArrayCompressed(stream, (int[])value, writeType);
                 break;
             case Protocol18.GpType.CompressedLongArray:
-                this.WriteInt64ArrayCompressed(stream, (long[])value, writeType);
+                WriteInt64ArrayCompressed(stream, (long[])value, writeType);
                 break;
             case Protocol18.GpType.CustomTypeArray:
-                this.WriteCustomTypeArray(stream, value, writeType);
+                WriteCustomTypeArray(stream, value, writeType);
                 break;
             case Protocol18.GpType.DictionaryArray:
-                this.WriteDictionaryArray(stream, (IDictionary[])value, writeType);
+                WriteDictionaryArray(stream, (IDictionary[])value, writeType);
                 break;
             case Protocol18.GpType.HashtableArray:
-                this.WriteHashtableArray(stream, value, writeType);
+                WriteHashtableArray(stream, value, writeType);
                 break;
         }
     }
@@ -1306,22 +1058,22 @@ public class Protocol18 : IProtocol
         if (setType)
             stream.WriteByte((byte)26);
         stream.WriteByte(serObject.Code);
-        this.WriteParameterTable(stream, serObject.Parameters);
+        WriteParameterTable(stream, serObject.Parameters);
     }
 
     private void WriteParameterTable(StreamBuffer stream, Dictionary<byte, object> parameters)
     {
         if (parameters == null || parameters.Count == 0)
         {
-            this.WriteByte(stream, (byte)0, false);
+            WriteByte(stream, (byte)0, false);
         }
         else
         {
-            this.WriteByte(stream, (byte)parameters.Count, false);
+            WriteByte(stream, (byte)parameters.Count, false);
             foreach (KeyValuePair<byte, object> parameter in parameters)
             {
                 stream.WriteByte(parameter.Key);
-                this.Write(stream, parameter.Value, true);
+                Write(stream, parameter.Value, true);
             }
         }
     }
@@ -1331,7 +1083,7 @@ public class Protocol18 : IProtocol
       OperationRequest operation,
       bool setType)
     {
-        this.SerializeOperationRequest(stream, operation.OperationCode, operation.Parameters, setType);
+        SerializeOperationRequest(stream, operation.OperationCode, operation.Parameters, setType);
     }
 
     public override void SerializeOperationRequest(
@@ -1343,7 +1095,7 @@ public class Protocol18 : IProtocol
         if (setType)
             stream.WriteByte((byte)24);
         stream.WriteByte(operationCode);
-        this.WriteParameterTable(stream, parameters);
+        WriteParameterTable(stream, parameters);
     }
 
     public override void SerializeOperationResponse(
@@ -1354,7 +1106,7 @@ public class Protocol18 : IProtocol
         if (setType)
             stream.WriteByte((byte)25);
         stream.WriteByte(serObject.OperationCode);
-        this.WriteInt16(stream, serObject.ReturnCode, false);
+        WriteInt16(stream, serObject.ReturnCode, false);
         if (string.IsNullOrEmpty(serObject.DebugMessage))
         {
             stream.WriteByte((byte)8);
@@ -1362,9 +1114,9 @@ public class Protocol18 : IProtocol
         else
         {
             stream.WriteByte((byte)7);
-            this.WriteString(stream, serObject.DebugMessage, false);
+            WriteString(stream, serObject.DebugMessage, false);
         }
-        this.WriteParameterTable(stream, serObject.Parameters);
+        WriteParameterTable(stream, serObject.Parameters);
     }
 
     internal void WriteByte(StreamBuffer stream, byte value, bool writeType)
@@ -1419,10 +1171,10 @@ public class Protocol18 : IProtocol
             stream.WriteByte((byte)6);
         int offset;
         byte[] bufferAndAdvance = stream.GetBufferAndAdvance(8, out offset);
-        lock (this.memDoubleBlock)
+        lock (memDoubleBlock)
         {
-            this.memDoubleBlock[0] = value;
-            Buffer.BlockCopy((Array)this.memDoubleBlock, 0, (Array)bufferAndAdvance, offset, 8);
+            memDoubleBlock[0] = value;
+            Buffer.BlockCopy((Array)memDoubleBlock, 0, (Array)bufferAndAdvance, offset, 8);
         }
     }
 
@@ -1432,10 +1184,10 @@ public class Protocol18 : IProtocol
             stream.WriteByte((byte)5);
         int offset;
         byte[] bufferAndAdvance = stream.GetBufferAndAdvance(4, out offset);
-        lock (this.memFloatBlock)
+        lock (memFloatBlock)
         {
-            this.memFloatBlock[0] = value;
-            Buffer.BlockCopy((Array)this.memFloatBlock, 0, (Array)bufferAndAdvance, offset, 4);
+            memFloatBlock[0] = value;
+            Buffer.BlockCopy((Array)memFloatBlock, 0, (Array)bufferAndAdvance, offset, 4);
         }
     }
 
@@ -1446,7 +1198,7 @@ public class Protocol18 : IProtocol
         int byteCount = Encoding.UTF8.GetByteCount(value);
         if (byteCount > (int)short.MaxValue)
             throw new NotSupportedException("Strings that exceed a UTF8-encoded byte-length of 32767 (short.MaxValue) are not supported. Yours is: " + byteCount.ToString());
-        this.WriteIntLength(stream, byteCount);
+        WriteIntLength(stream, byteCount);
         int offset = 0;
         byte[] bufferAndAdvance = stream.GetBufferAndAdvance(byteCount, out offset);
         Encoding.UTF8.GetBytes(value, 0, value.Length, bufferAndAdvance, offset);
@@ -1457,11 +1209,11 @@ public class Protocol18 : IProtocol
         Hashtable hashtable = (Hashtable)value;
         if (writeType)
             stream.WriteByte((byte)21);
-        this.WriteIntLength(stream, hashtable.Count);
+        WriteIntLength(stream, hashtable.Count);
         foreach (object key in hashtable.Keys)
         {
-            this.Write(stream, key, true);
-            this.Write(stream, hashtable[key], true);
+            Write(stream, key, true);
+            Write(stream, hashtable[key], true);
         }
     }
 
@@ -1469,7 +1221,7 @@ public class Protocol18 : IProtocol
     {
         if (writeType)
             stream.WriteByte((byte)67);
-        this.WriteIntLength(stream, value.Length);
+        WriteIntLength(stream, value.Length);
         stream.Write(value, 0, value.Length);
     }
 
@@ -1478,7 +1230,7 @@ public class Protocol18 : IProtocol
         if (writeType)
             stream.WriteByte((byte)67);
         int count = seg.Count;
-        this.WriteIntLength(stream, count);
+        WriteIntLength(stream, count);
         if (count <= 0)
             return;
         stream.Write(seg.Array, seg.Offset, count);
@@ -1489,7 +1241,7 @@ public class Protocol18 : IProtocol
         if (writeType)
             stream.WriteByte((byte)67);
         int count = buffer.Count;
-        this.WriteIntLength(stream, count);
+        WriteIntLength(stream, count);
         stream.Write(buffer.Buffer, buffer.Offset, count);
         buffer.Release();
     }
@@ -1498,25 +1250,25 @@ public class Protocol18 : IProtocol
     {
         if (writeType)
             stream.WriteByte((byte)73);
-        this.WriteIntLength(stream, value.Length);
+        WriteIntLength(stream, value.Length);
         for (int index = 0; index < value.Length; ++index)
-            this.WriteCompressedInt32(stream, value[index], false);
+            WriteCompressedInt32(stream, value[index], false);
     }
 
     private void WriteInt64ArrayCompressed(StreamBuffer stream, long[] values, bool setType)
     {
         if (setType)
             stream.WriteByte((byte)74);
-        this.WriteIntLength(stream, values.Length);
+        WriteIntLength(stream, values.Length);
         for (int index = 0; index < values.Length; ++index)
-            this.WriteCompressedInt64(stream, values[index], false);
+            WriteCompressedInt64(stream, values[index], false);
     }
 
     internal void WriteBoolArray(StreamBuffer stream, bool[] value, bool writeType)
     {
         if (writeType)
             stream.WriteByte((byte)66);
-        this.WriteIntLength(stream, value.Length);
+        WriteIntLength(stream, value.Length);
         int num1 = value.Length >> 3;
         byte[] buffer = new byte[num1 + 1];
         int count = 0;
@@ -1588,16 +1340,16 @@ public class Protocol18 : IProtocol
     {
         if (writeType)
             stream.WriteByte((byte)68);
-        this.WriteIntLength(stream, value.Length);
+        WriteIntLength(stream, value.Length);
         for (int index = 0; index < value.Length; ++index)
-            this.WriteInt16(stream, value[index], false);
+            WriteInt16(stream, value[index], false);
     }
 
     internal void WriteSingleArray(StreamBuffer stream, float[] values, bool setType)
     {
         if (setType)
             stream.WriteByte((byte)69);
-        this.WriteIntLength(stream, values.Length);
+        WriteIntLength(stream, values.Length);
         int num = values.Length * 4;
         int offset;
         byte[] bufferAndAdvance = stream.GetBufferAndAdvance(num, out offset);
@@ -1608,7 +1360,7 @@ public class Protocol18 : IProtocol
     {
         if (setType)
             stream.WriteByte((byte)70);
-        this.WriteIntLength(stream, values.Length);
+        WriteIntLength(stream, values.Length);
         int num = values.Length * 8;
         int offset;
         byte[] bufferAndAdvance = stream.GetBufferAndAdvance(num, out offset);
@@ -1620,29 +1372,29 @@ public class Protocol18 : IProtocol
         string[] strArray = (string[])value0;
         if (writeType)
             stream.WriteByte((byte)71);
-        this.WriteIntLength(stream, strArray.Length);
+        WriteIntLength(stream, strArray.Length);
         for (int index = 0; index < strArray.Length; ++index)
         {
             if (strArray[index] == null)
                 throw new InvalidDataException("Unexpected - cannot serialize string array with null element " + index.ToString());
-            this.WriteString(stream, strArray[index], false);
+            WriteString(stream, strArray[index], false);
         }
     }
 
     private void WriteObjectArray(StreamBuffer stream, object array, bool writeType)
     {
-        this.WriteObjectArray(stream, (IList)array, writeType);
+        WriteObjectArray(stream, (IList)array, writeType);
     }
 
     private void WriteObjectArray(StreamBuffer stream, IList array, bool writeType)
     {
         if (writeType)
             stream.WriteByte((byte)23);
-        this.WriteIntLength(stream, array.Count);
+        WriteIntLength(stream, array.Count);
         for (int index = 0; index < array.Count; ++index)
         {
             object obj = array[index];
-            this.Write(stream, obj, true);
+            Write(stream, obj, true);
         }
     }
 
@@ -1650,9 +1402,9 @@ public class Protocol18 : IProtocol
     {
         object[] objArray = (object[])value;
         stream.WriteByte((byte)64);
-        this.WriteIntLength(stream, objArray.Length);
+        WriteIntLength(stream, objArray.Length);
         foreach (object obj in objArray)
-            this.Write(stream, obj, true);
+            Write(stream, obj, true);
     }
 
     private void WriteCustomTypeBody(CustomType customType, StreamBuffer stream, object value)
@@ -1660,7 +1412,7 @@ public class Protocol18 : IProtocol
         if (customType.SerializeFunction != null)
         {
             byte[] buffer = customType.SerializeFunction(value);
-            this.WriteIntLength(stream, buffer.Length);
+            WriteIntLength(stream, buffer.Length);
             stream.Write(buffer, 0, buffer.Length);
         }
         else if (customType.SerializeStreamFunction != null)
@@ -1671,17 +1423,17 @@ public class Protocol18 : IProtocol
             int count1 = stream.Position - position - 1;
             if ((long)count1 != (long)num)
                 Log.Debug("Serialization for Custom Type '" + value.GetType()?.ToString() + "' returns size " + num.ToString() + " bytes but wrote " + count1.ToString() + " bytes. Sending the latter as size.");
-            int count2 = this.WriteCompressedUInt32(this.memCustomTypeBodyLengthSerialized, (uint)count1);
+            int count2 = WriteCompressedUInt32(memCustomTypeBodyLengthSerialized, (uint)count1);
             if (count2 == 1)
             {
-                stream.GetBuffer()[position] = this.memCustomTypeBodyLengthSerialized[0];
+                stream.GetBuffer()[position] = memCustomTypeBodyLengthSerialized[0];
             }
             else
             {
                 for (int index = 0; index < count2 - 1; ++index)
                     stream.WriteByte((byte)0);
                 Buffer.BlockCopy((Array)stream.GetBuffer(), position + 1, (Array)stream.GetBuffer(), position + count2, count1);
-                Buffer.BlockCopy((Array)this.memCustomTypeBodyLengthSerialized, 0, (Array)stream.GetBuffer(), position, count2);
+                Buffer.BlockCopy((Array)memCustomTypeBodyLengthSerialized, 0, (Array)stream.GetBuffer(), position, count2);
                 stream.Position = position + count2 + count1;
             }
         }
@@ -1707,7 +1459,7 @@ public class Protocol18 : IProtocol
         }
         else
             stream.WriteByte(customType.Code);
-        this.WriteCustomTypeBody(customType, stream, value);
+        WriteCustomTypeBody(customType, stream, value);
     }
 
     private void WriteCustomTypeArray(StreamBuffer stream, object value, bool writeType)
@@ -1720,10 +1472,10 @@ public class Protocol18 : IProtocol
             throw new Exception("Write failed. Custom type of element not found: " + elementType?.ToString());
         if (writeType)
             stream.WriteByte((byte)83);
-        this.WriteIntLength(stream, list.Count);
+        WriteIntLength(stream, list.Count);
         stream.WriteByte(customType.Code);
         foreach (object obj in (IEnumerable)list)
-            this.WriteCustomTypeBody(customType, stream, obj);
+            WriteCustomTypeBody(customType, stream, obj);
     }
 
     private bool WriteArrayHeader(StreamBuffer stream, Type type)
@@ -1731,7 +1483,7 @@ public class Protocol18 : IProtocol
         Type? elementType;
         for (elementType = type.GetElementType(); elementType.IsArray; elementType = elementType.GetElementType())
             stream.WriteByte((byte)64);
-        Protocol18.GpType codeOfType = this.GetCodeOfType(elementType);
+        Protocol18.GpType codeOfType = GetCodeOfType(elementType);
         if (codeOfType == Protocol18.GpType.Unknown)
             return false;
         stream.WriteByte((byte)(codeOfType | Protocol18.GpType.CustomTypeSlim));
@@ -1744,11 +1496,11 @@ public class Protocol18 : IProtocol
       Protocol18.GpType keyWriteType,
       Protocol18.GpType valueWriteType)
     {
-        this.WriteIntLength(stream, dictionary.Count);
+        WriteIntLength(stream, dictionary.Count);
         foreach (DictionaryEntry dictionaryEntry in dictionary)
         {
-            this.Write(stream, dictionaryEntry.Key, keyWriteType == Protocol18.GpType.Unknown);
-            this.Write(stream, dictionaryEntry.Value!, valueWriteType == Protocol18.GpType.Unknown);
+            Write(stream, dictionaryEntry.Key, keyWriteType == Protocol18.GpType.Unknown);
+            Write(stream, dictionaryEntry.Value!, valueWriteType == Protocol18.GpType.Unknown);
         }
     }
 
@@ -1758,9 +1510,9 @@ public class Protocol18 : IProtocol
             stream.WriteByte((byte)20);
         Protocol18.GpType keyWriteType;
         Protocol18.GpType valueWriteType;
-        this.WriteDictionaryHeader(stream, dict.GetType(), out keyWriteType, out valueWriteType);
+        WriteDictionaryHeader(stream, dict.GetType(), out keyWriteType, out valueWriteType);
         IDictionary dictionary = (IDictionary)dict;
-        this.WriteDictionaryElements(stream, dictionary, keyWriteType, valueWriteType);
+        WriteDictionaryElements(stream, dictionary, keyWriteType, valueWriteType);
     }
 
     private void WriteDictionaryHeader(
@@ -1777,7 +1529,7 @@ public class Protocol18 : IProtocol
         }
         else
         {
-            keyWriteType = genericArguments[0].IsPrimitive || !(genericArguments[0] != typeof(string)) ? this.GetCodeOfType(genericArguments[0]) : throw new InvalidDataException("Unexpected - cannot serialize Dictionary with key type: " + genericArguments[0]?.ToString());
+            keyWriteType = genericArguments[0].IsPrimitive || !(genericArguments[0] != typeof(string)) ? GetCodeOfType(genericArguments[0]) : throw new InvalidDataException("Unexpected - cannot serialize Dictionary with key type: " + genericArguments[0]?.ToString());
             if (keyWriteType == Protocol18.GpType.Unknown)
                 throw new InvalidDataException("Unexpected - cannot serialize Dictionary with key type: " + genericArguments[0]?.ToString());
             stream.WriteByte((byte)keyWriteType);
@@ -1789,23 +1541,23 @@ public class Protocol18 : IProtocol
         }
         else if (genericArguments[1].IsArray)
         {
-            if (!this.WriteArrayType(stream, genericArguments[1], out valueWriteType))
+            if (!WriteArrayType(stream, genericArguments[1], out valueWriteType))
                 throw new InvalidDataException("Unexpected - cannot serialize Dictionary with value type: " + genericArguments[1]?.ToString());
         }
         else
         {
-            valueWriteType = this.GetCodeOfType(genericArguments[1]);
+            valueWriteType = GetCodeOfType(genericArguments[1]);
             if (valueWriteType == Protocol18.GpType.Unknown)
                 throw new InvalidDataException("Unexpected - cannot serialize Dictionary with value type: " + genericArguments[1]?.ToString());
             if (valueWriteType == Protocol18.GpType.Array)
             {
-                if (!this.WriteArrayHeader(stream, genericArguments[1]))
+                if (!WriteArrayHeader(stream, genericArguments[1]))
                     throw new InvalidDataException("Unexpected - cannot serialize Dictionary with value type: " + genericArguments[1]?.ToString());
             }
             else if (valueWriteType == Protocol18.GpType.Dictionary)
             {
                 stream.WriteByte((byte)valueWriteType);
-                this.WriteDictionaryHeader(stream, genericArguments[1], out Protocol18.GpType _, out Protocol18.GpType _);
+                WriteDictionaryHeader(stream, genericArguments[1], out Protocol18.GpType _, out Protocol18.GpType _);
             }
             else
                 stream.WriteByte((byte)valueWriteType);
@@ -1821,14 +1573,14 @@ public class Protocol18 : IProtocol
         {
             for (; elementType != null && elementType.IsArray; elementType = elementType.GetElementType())
                 stream.WriteByte((byte)64);
-            byte num = (byte)(this.GetCodeOfType(elementType) | Protocol18.GpType.Array);
+            byte num = (byte)(GetCodeOfType(elementType) | Protocol18.GpType.Array);
             stream.WriteByte(num);
             writeType = Protocol18.GpType.Array;
             return true;
         }
         if (elementType.IsPrimitive)
         {
-            byte num = (byte)(this.GetCodeOfType(elementType) | Protocol18.GpType.Array);
+            byte num = (byte)(GetCodeOfType(elementType) | Protocol18.GpType.Array);
             if (num == (byte)226)
                 num = (byte)67;
             stream.WriteByte(num);
@@ -1867,9 +1619,9 @@ public class Protocol18 : IProtocol
         Hashtable[] hashtableArray = (Hashtable[])value;
         if (writeType)
             stream.WriteByte((byte)85);
-        this.WriteIntLength(stream, hashtableArray.Length);
+        WriteIntLength(stream, hashtableArray.Length);
         foreach (Hashtable hashtable in hashtableArray)
-            this.WriteHashtable(stream, (object)hashtable, false);
+            WriteHashtable(stream, (object)hashtable, false);
     }
 
     private void WriteDictionaryArray(StreamBuffer stream, IDictionary[] dictArray, bool writeType)
@@ -1877,20 +1629,20 @@ public class Protocol18 : IProtocol
         stream.WriteByte((byte)84);
         Protocol18.GpType keyWriteType;
         Protocol18.GpType valueWriteType;
-        this.WriteDictionaryHeader(stream, dictArray.GetType().GetElementType()!, out keyWriteType, out valueWriteType);
-        this.WriteIntLength(stream, dictArray.Length);
+        WriteDictionaryHeader(stream, dictArray.GetType().GetElementType()!, out keyWriteType, out valueWriteType);
+        WriteIntLength(stream, dictArray.Length);
         foreach (IDictionary dict in dictArray)
-            this.WriteDictionaryElements(stream, dict, keyWriteType, valueWriteType);
+            WriteDictionaryElements(stream, dict, keyWriteType, valueWriteType);
     }
 
     private void WriteIntLength(StreamBuffer stream, int value)
     {
-        this.WriteCompressedUInt32(stream, (uint)value);
+        WriteCompressedUInt32(stream, (uint)value);
     }
 
     private void WriteVarInt32(StreamBuffer stream, int value, bool writeType)
     {
-        this.WriteCompressedInt32(stream, value, writeType);
+        WriteCompressedInt32(stream, value, writeType);
     }
 
     private void WriteCompressedInt32(StreamBuffer stream, int value, bool writeType)
@@ -1913,7 +1665,7 @@ public class Protocol18 : IProtocol
                 if (value <= (int)ushort.MaxValue)
                 {
                     stream.WriteByte((byte)13);
-                    this.WriteUShort(stream, (ushort)value);
+                    WriteUShort(stream, (ushort)value);
                     return;
                 }
             }
@@ -1928,15 +1680,15 @@ public class Protocol18 : IProtocol
                 if (value >= -65535)
                 {
                     stream.WriteByte((byte)14);
-                    this.WriteUShort(stream, (ushort)-value);
+                    WriteUShort(stream, (ushort)-value);
                     return;
                 }
             }
         }
         if (writeType)
             stream.WriteByte((byte)9);
-        uint num = this.EncodeZigZag32(value);
-        this.WriteCompressedUInt32(stream, num);
+        uint num = EncodeZigZag32(value);
+        WriteCompressedUInt32(stream, num);
     }
 
     private void WriteCompressedInt64(StreamBuffer stream, long value, bool writeType)
@@ -1959,7 +1711,7 @@ public class Protocol18 : IProtocol
                 if (value <= (long)ushort.MaxValue)
                 {
                     stream.WriteByte((byte)17);
-                    this.WriteUShort(stream, (ushort)value);
+                    WriteUShort(stream, (ushort)value);
                     return;
                 }
             }
@@ -1974,21 +1726,21 @@ public class Protocol18 : IProtocol
                 if (value >= -65535L)
                 {
                     stream.WriteByte((byte)18);
-                    this.WriteUShort(stream, (ushort)-value);
+                    WriteUShort(stream, (ushort)-value);
                     return;
                 }
             }
         }
         if (writeType)
             stream.WriteByte((byte)10);
-        ulong num = this.EncodeZigZag64(value);
-        this.WriteCompressedUInt64(stream, num);
+        ulong num = EncodeZigZag64(value);
+        WriteCompressedUInt64(stream, num);
     }
 
     private void WriteCompressedUInt32(StreamBuffer stream, uint value)
     {
-        lock (this.memCompressedUInt32)
-            stream.Write(this.memCompressedUInt32, 0, this.WriteCompressedUInt32(this.memCompressedUInt32, value));
+        lock (memCompressedUInt32)
+            stream.Write(memCompressedUInt32, 0, WriteCompressedUInt32(memCompressedUInt32, value));
     }
 
     private int WriteCompressedUInt32(byte[] buffer, uint value)
@@ -2006,16 +1758,16 @@ public class Protocol18 : IProtocol
     private void WriteCompressedUInt64(StreamBuffer stream, ulong value)
     {
         int index = 0;
-        lock (this.memCompressedUInt64)
+        lock (memCompressedUInt64)
         {
-            this.memCompressedUInt64[index] = (byte)(value & (ulong)sbyte.MaxValue);
+            memCompressedUInt64[index] = (byte)(value & (ulong)sbyte.MaxValue);
             for (value >>= 7; value > 0UL; value >>= 7)
             {
-                this.memCompressedUInt64[index] |= (byte)128;
-                this.memCompressedUInt64[++index] = (byte)(value & (ulong)sbyte.MaxValue);
+                memCompressedUInt64[index] |= (byte)128;
+                memCompressedUInt64[++index] = (byte)(value & (ulong)sbyte.MaxValue);
             }
             int count = index + 1;
-            stream.Write(this.memCompressedUInt64, 0, count);
+            stream.Write(memCompressedUInt64, 0, count);
         }
     }
 

@@ -3,7 +3,7 @@
 public class EventData
 {
     public byte Code;
-    public Dictionary<byte, object> Parameters = [];
+    public Dictionary<byte, object?> Parameters = [];
     public byte SenderKey = 254;
     public int sender = -1;
     public byte CustomDataKey = 245;
@@ -16,7 +16,7 @@ public class EventData
             if (flag)
             {
                 object? num;
-                this.sender = (this.Parameters.TryGetValue(this.SenderKey, out num) ? (int)num : (-1));
+                this.sender = (this.Parameters.TryGetValue(this.SenderKey, out num) && num != null ? (int)num : (-1));
             }
             return this.sender;
         }

@@ -7,16 +7,16 @@ internal class NCommandPool
     public NCommand Acquire(byte[] inBuff, ref int readingOffset)
     {
         NCommand ncommand;
-        lock (this.pool)
+        lock (pool)
         {
-            if (this.pool.Count == 0)
+            if (pool.Count == 0)
             {
                 ncommand = new NCommand(inBuff, ref readingOffset);
                 ncommand.returnPool = this;
             }
             else
             {
-                ncommand = this.pool.Pop();
+                ncommand = pool.Pop();
                 ncommand.Initialize(inBuff, ref readingOffset);
             }
         }
@@ -26,16 +26,16 @@ internal class NCommandPool
     public NCommand Acquire(NCommand.CommandType commandType, StreamBuffer payload, byte channel)
     {
         NCommand ncommand;
-        lock (this.pool)
+        lock (pool)
         {
-            if (this.pool.Count == 0)
+            if (pool.Count == 0)
             {
                 ncommand = new NCommand(commandType, payload, channel);
                 ncommand.returnPool = this;
             }
             else
             {
-                ncommand = this.pool.Pop();
+                ncommand = pool.Pop();
                 ncommand.Initialize(commandType, payload, channel);
             }
         }
@@ -45,7 +45,7 @@ internal class NCommandPool
     public void Release(NCommand nCommand)
     {
         nCommand.Reset();
-        lock (this.pool)
-            this.pool.Push(nCommand);
+        lock (pool)
+            pool.Push(nCommand);
     }
 }

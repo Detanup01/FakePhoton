@@ -3,5 +3,5 @@
 public class OperationRequest
 {
     public byte OperationCode;
-    public Dictionary<byte, object> Parameters = [];
+    public Dictionary<byte, object?> Parameters = [];
 }

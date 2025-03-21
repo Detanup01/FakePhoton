@@ -33,7 +33,7 @@ public abstract class IProtocol
     public abstract object Deserialize(
       StreamBuffer din,
       byte type,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None);
+      DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract short DeserializeShort(StreamBuffer din);
 
@@ -42,39 +42,39 @@ public abstract class IProtocol
     public abstract EventData DeserializeEventData(
       StreamBuffer din,
       EventData? target = null,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None);
+      DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract OperationRequest DeserializeOperationRequest(
       StreamBuffer din,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None);
+      DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract OperationResponse DeserializeOperationResponse(
       StreamBuffer stream,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None);
+      DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract DisconnectMessage DeserializeDisconnectMessage(StreamBuffer stream);
 
     public byte[] Serialize(object obj)
     {
         StreamBuffer dout = new StreamBuffer(64);
-        this.Serialize(dout, obj, true);
+        Serialize(dout, obj, true);
         return dout.ToArray();
     }
 
-    public object Deserialize(StreamBuffer stream) => this.Deserialize(stream, stream.ReadByte());
+    public object Deserialize(StreamBuffer stream) => Deserialize(stream, stream.ReadByte());
 
     public object Deserialize(byte[] serializedData)
     {
         StreamBuffer din = new StreamBuffer(serializedData);
-        return this.Deserialize(din, din.ReadByte());
+        return Deserialize(din, din.ReadByte());
     }
 
     public object DeserializeMessage(StreamBuffer stream)
     {
-        return this.Deserialize(stream, stream.ReadByte());
+        return Deserialize(stream, stream.ReadByte());
     }
 
-    internal void SerializeMessage(StreamBuffer ms, object msg) => this.Serialize(ms, msg, true);
+    internal void SerializeMessage(StreamBuffer ms, object msg) => Serialize(ms, msg, true);
 
     public enum DeserializationFlags
     {

@@ -8,9 +8,9 @@ public class ByteArraySlice : IDisposable
     private readonly ByteArraySlicePool? returnPool;
     private readonly int stackIndex;
 
-    internal ByteArraySlice(ByteArraySlicePool returnPool, int stackIndex)
+    internal ByteArraySlice(ByteArraySlicePool? returnPool, int stackIndex)
     {
-        this.Buffer = stackIndex == 0 ? null : new byte[1 << stackIndex];
+        Buffer = stackIndex == 0 ? null : new byte[1 << stackIndex];
         this.returnPool = returnPool;
         this.stackIndex = stackIndex;
     }
@@ -24,28 +24,23 @@ public class ByteArraySlice : IDisposable
         this.stackIndex = -1;
     }
 
-    public ByteArraySlice()
+    public ByteArraySlice() : this(null, -1)
     {
-        this.returnPool = null;
-        this.stackIndex = -1;
     }
 
-    public void Dispose() => this.Release();
+    public void Dispose() => Release();
 
     public bool Release()
     {
-        if (this.stackIndex < 0)
-            return false;
-        this.Count = 0;
-        this.Offset = 0;
-        if (returnPool == null)
-            return true;
-        return returnPool!.Release(this, this.stackIndex);
+        if (stackIndex < 0) return false;
+        Count = 0;
+        Offset = 0;
+        return returnPool?.Release(this, stackIndex) ?? true;
     }
 
     public void Reset()
     {
-        this.Count = 0;
-        this.Offset = 0;
+        Count = 0;
+        Offset = 0;
     }
 }

@@ -8,26 +8,20 @@ public class ByteArraySlicePool
 
     public int MinStackIndex
     {
-        get => this.minStackIndex;
-        set => this.minStackIndex = value > 0 ? (value < 31 ? value : 31) : 1;
+        get => minStackIndex;
+        set => minStackIndex = Math.Clamp(value, 1, 31);
     }
 
-    public int AllocationCounter => this.allocationCounter;
+    public int AllocationCounter => allocationCounter;
 
     public ByteArraySlicePool()
     {
-        lock (this.poolTiers)
-            this.poolTiers[0] = new Stack<ByteArraySlice>();
+        poolTiers[0] = new Stack<ByteArraySlice>();
     }
 
     public ByteArraySlice Acquire(byte[] buffer, int offset = 0, int count = 0)
     {
-        ByteArraySlice byteArraySlice;
-        lock (this.poolTiers)
-        {
-            lock (this.poolTiers[0])
-                byteArraySlice = this.PopOrCreate(this.poolTiers[0], 0);
-        }
+        var byteArraySlice = GetOrCreateSlice(0);
         byteArraySlice.Buffer = buffer;
         byteArraySlice.Offset = offset;
         byteArraySlice.Count = count;
@@ -37,68 +31,60 @@ public class ByteArraySlicePool
     public ByteArraySlice Acquire(int minByteCount)
     {
         if (minByteCount < 0)
-            throw new Exception(typeof(ByteArraySlice).Name + " requires a positive minByteCount.");
-        int minStackIndex = this.minStackIndex;
+            throw new ArgumentException("minByteCount must be positive.", nameof(minByteCount));
+
+        int stackIndex = CalculateStackIndex(minByteCount);
+        return GetOrCreateSlice(stackIndex);
+    }
+
+    private int CalculateStackIndex(int minByteCount)
+    {
+        int index = minStackIndex;
         if (minByteCount > 0)
         {
             int num = minByteCount - 1;
-            while (minStackIndex < 32 && num >> minStackIndex != 0)
-                ++minStackIndex;
+            while (index < 32 && num >> index != 0)
+                index++;
         }
-        lock (this.poolTiers)
-        {
-            Stack<ByteArraySlice> stack = this.poolTiers[minStackIndex];
-            if (stack == null)
-            {
-                stack = new Stack<ByteArraySlice>();
-                this.poolTiers[minStackIndex] = stack;
-            }
-            lock (stack)
-                return this.PopOrCreate(stack, minStackIndex);
-        }
+        return index;
     }
 
-    private ByteArraySlice PopOrCreate(Stack<ByteArraySlice> stack, int stackIndex)
+    private ByteArraySlice GetOrCreateSlice(int stackIndex)
     {
-        lock (stack)
+        lock (poolTiers)
         {
-            if (stack.Count > 0)
-                return stack.Pop();
+            var stack = poolTiers[stackIndex] ??= new Stack<ByteArraySlice>();
+            lock (stack)
+            {
+                if (stack.Count > 0)
+                    return stack.Pop();
+            }
+            allocationCounter++;
+            return new ByteArraySlice(this, stackIndex);
         }
-        ByteArraySlice byteArraySlice = new ByteArraySlice(this, stackIndex);
-        ++this.allocationCounter;
-        return byteArraySlice;
     }
 
     internal bool Release(ByteArraySlice slice, int stackIndex)
     {
-        if (slice == null || stackIndex < 0)
-            return false;
-        if (stackIndex == 0)
-            slice.Buffer = null;
-        lock (this.poolTiers)
+        if (slice == null || stackIndex < 0) return false;
+        if (stackIndex == 0) slice.Buffer = null;
+        lock (poolTiers[stackIndex])
         {
-            lock (this.poolTiers[stackIndex])
-                this.poolTiers[stackIndex].Push(slice);
+            poolTiers[stackIndex].Push(slice);
         }
         return true;
     }
 
-    public void ClearPools(int lower = 0, int upper = 2147483647)
+    public void ClearPools(int lower = 0, int upper = int.MaxValue)
     {
-        int minStackIndex = this.minStackIndex;
-        for (int index = 0; index < 32; ++index)
+        for (int i = 0; i < 32; i++)
         {
-            int num = 1 << index;
-            if (num >= lower && num <= upper)
+            int size = 1 << i;
+            if (size >= lower && size <= upper)
             {
-                lock (this.poolTiers)
+                lock (poolTiers)
                 {
-                    if (this.poolTiers[index] != null)
-                    {
-                        lock (this.poolTiers[index])
-                            this.poolTiers[index].Clear();
-                    }
+                    poolTiers[i]?.Clear();
                 }
             }
         }
