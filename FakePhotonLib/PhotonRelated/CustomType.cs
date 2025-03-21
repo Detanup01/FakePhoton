@@ -35,6 +35,6 @@ public class CustomType
 }
 
 public delegate byte[] SerializeMethod(object customObject);
-public delegate short SerializeStreamMethod(StreamBuffer outStream, object customObject);
+public delegate short SerializeStreamMethod(BinaryWriter outStream, object customObject);
 public delegate object DeserializeMethod(byte[] serializedCustomObject);
-public delegate object DeserializeStreamMethod(StreamBuffer inStream, short length);
+public delegate object DeserializeStreamMethod(BinaryReader inStream, short length);

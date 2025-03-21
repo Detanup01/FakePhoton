@@ -37,21 +37,22 @@ public static class Analyze
         Header header = new();
         header.Read(binaryReader);
         Console.WriteLine(header.ToString());
-        var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
-        StreamBuffer streamBuffer = new StreamBuffer(bytes);
-        int offset = 0;
+        //var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
+        //StreamBuffer streamBuffer = new StreamBuffer(bytes);
         for (int i = 0; i < header.CommandCount; i++)
         {
             Console.WriteLine($"\n-- {i} --");
-            NCommand command = CommandPool.Acquire(streamBuffer.GetBuffer(), ref offset);
-            Console.WriteLine(command.ToString());
-            if (command.Payload != null)
+            CommandPacket packet = new();
+            packet.Read(binaryReader);
+            Console.WriteLine(packet.ToString());
+            
+            if (packet.Payload != null)
             {
                 MessageAndCallback messageAndCallback = new(header.Challenge);
                 try
                 {
-                    messageAndCallback.Read(command.Payload);
-                    MessageManager.Parse(messageAndCallback);
+                    //messageAndCallback.Read(packet.Payload);
+                    //MessageManager.Parse(messageAndCallback);
                 }
                 catch (Exception ex)
                 {
@@ -59,7 +60,6 @@ public static class Analyze
                 }
             }
         }
-        Console.WriteLine($"Offset: {offset} Len : {streamBuffer.Length}");
     }
 
     static void ReadPacket()

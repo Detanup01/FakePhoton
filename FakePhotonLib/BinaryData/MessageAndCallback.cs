@@ -19,7 +19,7 @@ public enum RtsMessageType : byte
     Unknown = 255
 }
 
-public class MessageAndCallback
+public class MessageAndCallback : ICloneable
 {
     public MessageAndCallback()
     {
@@ -40,7 +40,7 @@ public class MessageAndCallback
     public bool IsEncrypted;
 
 
-    public void Read(StreamBuffer reader)
+    public void Read(BinaryReader reader)
     {
         byte b = reader.ReadByte();
         IsNotValid = b != 243 && b != 253;
@@ -66,8 +66,8 @@ public class MessageAndCallback
                 Log.Error("This should not throw!");
                 return;
             }
-            var data = cryptoProvider.Decrypt(reader.GetBuffer(), 2, reader.Length - 2);
-            reader = new(data);
+            var data = cryptoProvider.Decrypt(reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position)));
+            reader = new(new MemoryStream(data));
         }
         switch (MessageType)
         {
@@ -94,13 +94,13 @@ public class MessageAndCallback
         }
     }
 
-    public void Write(StreamBuffer writer)
+    public void Write(BinaryWriter writer)
     {
-        writer.WriteByte(253);
+        writer.Write(253);
         var msg_type = (byte)MessageType;
         if (IsEncrypted)
             msg_type |= 128;
-        writer.WriteByte(msg_type);
+        writer.Write(msg_type);
         byte[] data = [];
         if (operationResponse != null)
             Protocol.ProtocolDefault.Serialize(operationResponse!);
@@ -122,10 +122,26 @@ public class MessageAndCallback
         writer.Write(data, 0, data.Length);
     }
 
+    public void Reset()
+    {
+        MessageType = RtsMessageType.Init;
+        operationResponse = null;
+        operationRequest = null;
+        eventData = null;
+        disconnectMessage = null;
+        IsInit = null;
+        IsEncrypted = false;
+    }
+
     public override string ToString()
     {
         string? oprespone = operationResponse == null ? string.Empty : operationResponse.ToString();
         string? op_request = operationRequest == null ? string.Empty : operationRequest.ToString();
         return $"IsNotValid: {IsNotValid} {MessageType} {IsInit} {oprespone} {op_request}";
+    }
+
+    public object Clone()
+    {
+        return MemberwiseClone();
     }
 }

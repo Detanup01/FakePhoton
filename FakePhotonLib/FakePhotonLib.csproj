@@ -8,6 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Protocols\Protocol16.cs" />
+    <Compile Remove="Protocols\Protocol18_Old.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Protocols\Protocol16.cs" />
+    <None Include="Protocols\Protocol18_Old.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ModdableWebServer" Version="1.7.1" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />

@@ -1,5 +1,4 @@
-﻿using FakePhotonLib.PhotonRelated;
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 
 namespace FakePhotonLib.BinaryData;
 
@@ -12,7 +11,7 @@ public class Header
     public int ServerTime;
     public int Challenge;
 
-    public List<NCommand> Commands = [];
+    public List<CommandPacket> Commands = [];
 
 
     public void Read(BinaryReader reader)
@@ -20,7 +19,10 @@ public class Header
         PeerId = reader.ReadInt16Big();
         CrcOrEncrypted = reader.ReadByte();
         CommandCount = reader.ReadByte();
-        ServerTime = reader.ReadInt32Big();
+        if (IsServer)
+            ServerTime = reader.ReadInt32();
+        else
+            ServerTime = reader.ReadInt32Big();
         Challenge = reader.ReadInt32Big();
     }
 
@@ -38,7 +40,10 @@ public class Header
         writer.Write(BinaryPrimitives.ReverseEndianness(PeerId));
         writer.Write(CrcOrEncrypted);
         writer.Write(CommandCount);
-        writer.Write(BinaryPrimitives.ReverseEndianness(ServerTime));
+        if (IsServer)
+            writer.Write(BinaryPrimitives.ReverseEndianness(ServerTime));
+        else
+            writer.Write(ServerTime);
         writer.Write(BinaryPrimitives.ReverseEndianness(Challenge));
     }
     

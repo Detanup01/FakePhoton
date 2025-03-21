@@ -7,7 +7,7 @@ public static class MessageManager
 {
     public static MessageAndCallback Parse(MessageAndCallback messageAndCallback)
     {
-        MessageAndCallback messageAndCallback1 = messageAndCallback;
+        MessageAndCallback ReturnMessage = (MessageAndCallback)messageAndCallback.Clone();
         // This for checking client what sent.
         if (messageAndCallback.operationResponse != null)
         {
@@ -16,13 +16,16 @@ public static class MessageManager
 
         if (messageAndCallback.operationRequest != null)
         {
-            messageAndCallback1.operationResponse = OperationRequestManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationRequest);
+            ReturnMessage.Reset();
+            ReturnMessage.operationResponse = OperationRequestManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationRequest);
         }
         if (messageAndCallback.IsInit != null)
         {
-            messageAndCallback1.MessageType = RtsMessageType.InitResponse;
+            ReturnMessage.Reset();
+            ReturnMessage.MessageType = RtsMessageType.InitResponse;
+
         }
-        Log.Information(messageAndCallback1.ToString());
-        return messageAndCallback1;
+        Log.Information(ReturnMessage.ToString());
+        return ReturnMessage;
     }
 }

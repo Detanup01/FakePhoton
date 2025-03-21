@@ -1,5 +1,6 @@
 ﻿using FakePhotonLib.Managers;
 using FakePhotonLib.PacketAnalyzer;
+using FakePhotonLib.Testings;
 
 namespace FakePhotonConsole;
 
@@ -9,7 +10,8 @@ internal class Program
     {
         
         LogManager.CreateNew();
-        Analyze.Init();
+        BinaryRWTest.protocol18_test();
+        //Analyze.Init();
         //EncryptionManager.EncryptionTest();
         Console.ReadLine();
         LogManager.Close();

@@ -8,7 +8,7 @@ using Serilog;
 
 namespace FakePhotonLib.Servers;
 
-public class PhotonUDPServer(string uniqueName, IPAddress address, int port) : UdpServer(address, port)
+public class NameServer_Photon(string uniqueName, IPAddress address, int port) : UdpServer(address, port)
 {
     public string UniqueName = uniqueName;
 
@@ -24,6 +24,7 @@ public class PhotonUDPServer(string uniqueName, IPAddress address, int port) : U
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
         Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", UniqueName, Endpoint, Convert.ToHexString(buf));
+        /*
         using BinaryReader binaryReader = new(new MemoryStream(buf));
         Header header = new();
         header.Read(binaryReader);
@@ -54,10 +55,12 @@ public class PhotonUDPServer(string uniqueName, IPAddress address, int port) : U
         streamBuffer.Flush();
         EnqueueHeaders.Enqueue((endpoint, header));
         MessageWork();
+        */
     }
 
     public void MessageWork()
     {
+        /*
         EndPoint? toSendDest = null;
         Header header = new()
         { 
@@ -100,5 +103,6 @@ public class PhotonUDPServer(string uniqueName, IPAddress address, int port) : U
             
 
         }
+        */
     }
 }

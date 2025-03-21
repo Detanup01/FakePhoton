@@ -11,70 +11,72 @@ public abstract class IProtocol
 
     public abstract byte[] VersionBytes { get; }
 
-    public abstract void Serialize(StreamBuffer dout, object serObject, bool setType);
+    public abstract void Serialize(BinaryWriter dout, object serObject, bool setType);
 
-    public abstract void SerializeShort(StreamBuffer dout, short serObject, bool setType);
+    public abstract void SerializeShort(BinaryWriter dout, short serObject, bool setType);
 
-    public abstract void SerializeString(StreamBuffer dout, string serObject, bool setType);
+    public abstract void SerializeString(BinaryWriter dout, string serObject, bool setType);
 
-    public abstract void SerializeEventData(StreamBuffer stream, EventData serObject, bool setType);
+    public abstract void SerializeEventData(BinaryWriter stream, EventData serObject, bool setType);
 
     public abstract void SerializeOperationRequest(
-      StreamBuffer stream,
+      BinaryWriter stream,
       byte operationCode,
       Dictionary<byte, object?>? parameters,
       bool setType);
 
     public abstract void SerializeOperationResponse(
-      StreamBuffer stream,
+      BinaryWriter stream,
       OperationResponse serObject,
       bool setType);
 
     public abstract object? Deserialize(
-      StreamBuffer din,
+      BinaryReader din,
       byte type,
       DeserializationFlags flags = DeserializationFlags.None);
 
-    public abstract short DeserializeShort(StreamBuffer din);
+    public abstract short DeserializeShort(BinaryReader din);
 
-    public abstract byte DeserializeByte(StreamBuffer din);
+    public abstract byte DeserializeByte(BinaryReader din);
 
     public abstract EventData DeserializeEventData(
-      StreamBuffer din,
+      BinaryReader din,
       EventData? target = null,
       DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract OperationRequest DeserializeOperationRequest(
-      StreamBuffer din,
+      BinaryReader din,
       DeserializationFlags flags = DeserializationFlags.None);
 
     public abstract OperationResponse DeserializeOperationResponse(
-      StreamBuffer stream,
+      BinaryReader stream,
       DeserializationFlags flags = DeserializationFlags.None);
 
-    public abstract DisconnectMessage DeserializeDisconnectMessage(StreamBuffer stream);
+    public abstract DisconnectMessage DeserializeDisconnectMessage(BinaryReader stream);
 
     public byte[] Serialize(object obj)
     {
-        StreamBuffer dout = new(64);
+        using MemoryStream ms = new(64);
+        using BinaryWriter dout = new(ms);
         Serialize(dout, obj, true);
-        return dout.ToArray();
+        return ms.ToArray();
     }
 
-    public object? Deserialize(StreamBuffer stream) => Deserialize(stream, stream.ReadByte());
+    public object? Deserialize(BinaryReader stream) => Deserialize(stream, stream.ReadByte());
 
     public object? Deserialize(byte[] serializedData)
     {
-        StreamBuffer din = new(serializedData);
-        return Deserialize(din, din.ReadByte());
+        MemoryStream din = new(serializedData);
+        BinaryReader reader = new BinaryReader(din);
+        return Deserialize(reader, reader.ReadByte());
     }
 
-    public object? DeserializeMessage(StreamBuffer stream)
+    public object? DeserializeMessage(BinaryReader stream)
     {
         return Deserialize(stream, stream.ReadByte());
     }
 
-    internal void SerializeMessage(StreamBuffer ms, object msg) => Serialize(ms, msg, true);
+    internal void SerializeMessage(BinaryWriter ms, object msg) => Serialize(ms, msg, true);
 
     public enum DeserializationFlags
     {
