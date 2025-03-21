@@ -75,7 +75,7 @@ public class MessageAndCallback
                 IsInit = true;
                 break;
             case RtsMessageType.InitResponse:
-                
+                break;
             case RtsMessageType.InternalOperationRequest:
                 operationRequest = Protocol.ProtocolDefault.DeserializeOperationRequest(reader);
                 break;

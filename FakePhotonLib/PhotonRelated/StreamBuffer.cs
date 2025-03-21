@@ -1,4 +1,6 @@
-﻿namespace FakePhotonLib.PhotonRelated;
+﻿using Serilog;
+
+namespace FakePhotonLib.PhotonRelated;
 
 public class StreamBuffer
 {
@@ -110,6 +112,7 @@ public class StreamBuffer
         int num = pos + count;
         CheckSize(num);
         if (num > len) len = num;
+        Log.Information("{srcOffset}, {pos}, {count}, {bufferLen} {bufLen}", srcOffset, pos, count, buffer.Length, buf.Length);
         Buffer.BlockCopy(buffer, srcOffset, buf, pos, count);
         pos = num;
     }

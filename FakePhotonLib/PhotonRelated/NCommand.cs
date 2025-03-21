@@ -1,5 +1,6 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Protocols;
+using Serilog;
 
 namespace FakePhotonLib.PhotonRelated;
 
@@ -177,8 +178,12 @@ public class NCommand : IComparable<NCommand>
             _ => readingOffset += Size - 12
         };
 
-        if (count == 0) return;
-        Payload = new StreamBuffer();
+        if (count == 0) 
+            return;
+        Log.Information("{reading}, {count}", readingOffset, count);
+        if (readingOffset == count)
+            return;
+        Payload = new StreamBuffer(count);
         Payload.Write(inBuff, readingOffset, count);
         Payload.Position = 0;
         readingOffset += count;

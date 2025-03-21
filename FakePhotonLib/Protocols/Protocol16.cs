@@ -1,428 +1,348 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.PhotonRelated.StructWrapping;
 using FakePhotonLib.PhotonRelated;
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace FakePhotonLib.Protocols;
 
 public class Protocol16 : IProtocol
 {
-    private readonly byte[] versionBytes =
-    [
-      (byte) 1,
-      (byte) 6
-    ];
-    private readonly byte[] memShort = new byte[2];
-    private readonly long[] memLongBlock = new long[1];
-    private readonly byte[] memLongBlockBytes = new byte[8];
+    private static readonly byte[] versionBytes = { 1, 6 };
+    private static readonly byte[] memShort = new byte[2];
+    private static readonly long[] memLongBlock = new long[1];
+    private static readonly byte[] memLongBlockBytes = new byte[8];
     private static readonly float[] memFloatBlock = new float[1];
     private static readonly byte[] memFloatBlockBytes = new byte[4];
-    private readonly double[] memDoubleBlock = new double[1];
-    private readonly byte[] memDoubleBlockBytes = new byte[8];
-    private readonly byte[] memInteger = new byte[4];
-    private readonly byte[] memLong = new byte[8];
-    private readonly byte[] memFloat = new byte[4];
-    private readonly byte[] memDouble = new byte[8];
+    private static readonly double[] memDoubleBlock = new double[1];
+    private static readonly byte[] memDoubleBlockBytes = new byte[8];
+    private static readonly byte[] memInteger = new byte[4];
+    private static readonly byte[] memLong = new byte[8];
+    private static readonly byte[] memFloat = new byte[4];
+    private static readonly byte[] memDouble = new byte[8];
 
     public override string ProtocolType => "GpBinaryV16";
-
-    public override byte[] VersionBytes => this.versionBytes;
+    public override byte[] VersionBytes => versionBytes;
 
     private bool SerializeCustom(StreamBuffer dout, object serObject)
     {
         Type key = serObject is StructWrapper structWrapper ? structWrapper.ttype : serObject.GetType();
-        CustomType customType;
-        if (!Protocol.TypeDict.TryGetValue(key, out customType))
+        if (!Protocol.TypeDict.TryGetValue(key, out CustomType? customType))
             return false;
-        if (customType.SerializeStreamFunction == null)
+
+        dout.WriteByte(99);
+        dout.WriteByte(customType.Code);
+
+        if (customType.SerializeFunction != null)
         {
             byte[] buffer = customType.SerializeFunction(serObject);
-            dout.WriteByte((byte)99);
-            dout.WriteByte(customType.Code);
-            this.SerializeLengthAsShort(dout, buffer.Length, "Custom Type " + customType.Code.ToString());
+            SerializeLengthAsShort(dout, buffer.Length, $"Custom Type {customType.Code}");
             dout.Write(buffer, 0, buffer.Length);
             return true;
         }
-        dout.WriteByte((byte)99);
-        dout.WriteByte(customType.Code);
+
         int position1 = dout.Position;
         dout.Position += 2;
-        short serObject1 = customType.SerializeStreamFunction(dout, serObject);
-        long position2 = (long)dout.Position;
+        short length = customType.SerializeStreamFunction!(dout, serObject);
+        long position2 = dout.Position;
         dout.Position = position1;
-        this.SerializeLengthAsShort(dout, (int)serObject1, "Custom Type " + customType.Code.ToString());
-        dout.Position += (int)serObject1;
-        if ((long)dout.Position != position2)
-            throw new Exception("Serialization failed. Stream position corrupted. Should be " + position2.ToString() + " is now: " + dout.Position.ToString() + " serializedLength: " + serObject1.ToString());
+        SerializeLengthAsShort(dout, length, $"Custom Type {customType.Code}");
+        dout.Position += length;
+
+        if (dout.Position != position2)
+            throw new Exception($"Serialization failed. Stream position corrupted. Should be {position2} is now: {dout.Position} serializedLength: {length}");
+
         return true;
     }
 
-    private object DeserializeCustom(
-      StreamBuffer din,
-      byte customTypeCode,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+    private object DeserializeCustom(StreamBuffer din, byte customTypeCode, DeserializationFlags flags = DeserializationFlags.None)
     {
-        short length = this.DeserializeShort(din);
-        if (length < (short)0)
-            throw new InvalidDataException("DeserializeCustom read negative length value: " + length.ToString() + " before position: " + din.Position.ToString());
-        CustomType customType;
-        if ((int)length <= din.Available && Protocol.CodeDict.TryGetValue(customTypeCode, out customType))
+        short length = DeserializeShort(din);
+        if (length < 0)
+            throw new InvalidDataException($"DeserializeCustom read negative length value: {length} before position: {din.Position}");
+
+        if (length <= din.Available && Protocol.CodeDict.TryGetValue(customTypeCode, out CustomType? customType))
         {
             if (customType.DeserializeStreamFunction == null)
             {
-                byte[] numArray = new byte[(int)length];
-                din.Read(numArray, 0, (int)length);
-                return customType.DeserializeFunction(numArray);
+                byte[] buffer2 = new byte[length];
+                din.Read(buffer2, 0, length);
+                return customType.DeserializeFunction!(buffer2);
             }
+
             int position = din.Position;
             object obj = customType.DeserializeStreamFunction(din, length);
-            if (din.Position - position != (int)length)
-                din.Position = position + (int)length;
+            if (din.Position - position != length)
+                din.Position = position + length;
             return obj;
         }
-        int count = (int)length <= din.Available ? (int)length : (int)(short)din.Available;
+
+        int count = Math.Min(length, din.Available);
         byte[] buffer = new byte[count];
         din.Read(buffer, 0, count);
-        return (object)buffer;
+        return buffer;
     }
 
     private Type GetTypeOfCode(byte typeCode)
     {
-        switch (typeCode)
+        return typeCode switch
         {
-            case 0:
-            case 42:
-                return typeof(object);
-            case 68:
-                return typeof(IDictionary);
-            case 97:
-                return typeof(string[]);
-            case 98:
-                return typeof(byte);
-            case 99:
-                return typeof(CustomType);
-            case 100:
-                return typeof(double);
-            case 101:
-                return typeof(EventData);
-            case 102:
-                return typeof(float);
-            case 104:
-                return typeof(Hashtable);
-            case 105:
-                return typeof(int);
-            case 107:
-                return typeof(short);
-            case 108:
-                return typeof(long);
-            case 110:
-                return typeof(int[]);
-            case 111:
-                return typeof(bool);
-            case 112:
-                return typeof(OperationResponse);
-            case 113:
-                return typeof(OperationRequest);
-            case 115:
-                return typeof(string);
-            case 120:
-                return typeof(byte[]);
-            case 121:
-                return typeof(Array);
-            case 122:
-                return typeof(object[]);
-            default:
-                Debug.WriteLine("missing type: " + typeCode.ToString());
-                throw new Exception("deserialize(): " + typeCode.ToString());
-        }
+            0 or 42 => typeof(object),
+            68 => typeof(IDictionary),
+            97 => typeof(string[]),
+            98 => typeof(byte),
+            99 => typeof(CustomType),
+            100 => typeof(double),
+            101 => typeof(EventData),
+            102 => typeof(float),
+            104 => typeof(Hashtable),
+            105 => typeof(int),
+            107 => typeof(short),
+            108 => typeof(long),
+            110 => typeof(int[]),
+            111 => typeof(bool),
+            112 => typeof(OperationResponse),
+            113 => typeof(OperationRequest),
+            115 => typeof(string),
+            120 => typeof(byte[]),
+            121 => typeof(Array),
+            122 => typeof(object[]),
+            _ => throw new Exception($"deserialize(): {typeCode}")
+        };
     }
 
-    private Protocol16.GpType GetCodeOfType(Type type)
+    private GpType GetCodeOfType(Type type)
     {
-        switch (Type.GetTypeCode(type))
+        return Type.GetTypeCode(type) switch
         {
-            case TypeCode.Boolean:
-                return Protocol16.GpType.Boolean;
-            case TypeCode.Byte:
-                return Protocol16.GpType.Byte;
-            case TypeCode.Int16:
-                return Protocol16.GpType.Short;
-            case TypeCode.Int32:
-                return Protocol16.GpType.Integer;
-            case TypeCode.Int64:
-                return Protocol16.GpType.Long;
-            case TypeCode.Single:
-                return Protocol16.GpType.Float;
-            case TypeCode.Double:
-                return Protocol16.GpType.Double;
-            case TypeCode.String:
-                return Protocol16.GpType.String;
-            default:
-                if (type.IsArray)
-                    return type == typeof(byte[]) ? Protocol16.GpType.ByteArray : Protocol16.GpType.Array;
-                if (type == typeof(Hashtable))
-                    return Protocol16.GpType.Hashtable;
-                if (type == typeof(List<object>))
-                    return Protocol16.GpType.ObjectArray;
-                if (type.IsGenericType && typeof(Dictionary<,>) == type.GetGenericTypeDefinition())
-                    return Protocol16.GpType.Dictionary;
-                if (type == typeof(EventData))
-                    return Protocol16.GpType.EventData;
-                if (type == typeof(OperationRequest))
-                    return Protocol16.GpType.OperationRequest;
-                return type == typeof(OperationResponse) ? Protocol16.GpType.OperationResponse : Protocol16.GpType.Unknown;
-        }
+            TypeCode.Boolean => GpType.Boolean,
+            TypeCode.Byte => GpType.Byte,
+            TypeCode.Int16 => GpType.Short,
+            TypeCode.Int32 => GpType.Integer,
+            TypeCode.Int64 => GpType.Long,
+            TypeCode.Single => GpType.Float,
+            TypeCode.Double => GpType.Double,
+            TypeCode.String => GpType.String,
+            _ when type.IsArray => type == typeof(byte[]) ? GpType.ByteArray : GpType.Array,
+            _ when type == typeof(Hashtable) => GpType.Hashtable,
+            _ when type == typeof(List<object>) => GpType.ObjectArray,
+            _ when type.IsGenericType && typeof(Dictionary<,>) == type.GetGenericTypeDefinition() => GpType.Dictionary,
+            _ when type == typeof(EventData) => GpType.EventData,
+            _ when type == typeof(OperationRequest) => GpType.OperationRequest,
+            _ when type == typeof(OperationResponse) => GpType.OperationResponse,
+            _ => GpType.Unknown,
+        };
     }
 
     private Array CreateArrayByType(byte arrayType, short length)
     {
-        return Array.CreateInstance(this.GetTypeOfCode(arrayType), (int)length);
+        return Array.CreateInstance(GetTypeOfCode(arrayType), length);
     }
 
-    public void SerializeOperationRequest(
-      StreamBuffer stream,
-      OperationRequest operation,
-      bool setType)
+    public void SerializeOperationRequest(StreamBuffer stream, OperationRequest operation, bool setType)
     {
-        this.SerializeOperationRequest(stream, operation.OperationCode, operation.Parameters, setType);
+        SerializeOperationRequest(stream, operation.OperationCode, operation.Parameters, setType);
     }
 
-    public override void SerializeOperationRequest(
-      StreamBuffer stream,
-      byte operationCode,
-      Dictionary<byte, object> parameters,
-      bool setType)
+    public override void SerializeOperationRequest(StreamBuffer stream, byte operationCode, Dictionary<byte, object?>? parameters, bool setType)
     {
-        if (setType)
-            stream.WriteByte((byte)113);
+        if (setType) stream.WriteByte(113);
         stream.WriteByte(operationCode);
-        this.SerializeParameterTable(stream, parameters);
+        SerializeParameterTable(stream, parameters);
     }
 
-    public override OperationRequest DeserializeOperationRequest(
-      StreamBuffer din,
-      IProtocol.DeserializationFlags flags)
+    public override OperationRequest DeserializeOperationRequest(StreamBuffer din, IProtocol.DeserializationFlags flags)
     {
         OperationRequest operationRequest = new OperationRequest()
         {
-            OperationCode = this.DeserializeByte(din)
+            OperationCode = DeserializeByte(din)
         };
-        operationRequest.Parameters = this.DeserializeParameterTable(din, operationRequest.Parameters, flags);
+        operationRequest.Parameters = DeserializeParameterTable(din, operationRequest.Parameters, flags);
         return operationRequest;
     }
 
-    public override void SerializeOperationResponse(
-      StreamBuffer stream,
-      OperationResponse serObject,
-      bool setType)
+    public override void SerializeOperationResponse(StreamBuffer stream, OperationResponse serObject, bool setType)
     {
-        if (setType)
-            stream.WriteByte((byte)112);
+        if (setType) stream.WriteByte(112);
         stream.WriteByte(serObject.OperationCode);
-        this.SerializeShort(stream, serObject.ReturnCode, false);
+        SerializeShort(stream, serObject.ReturnCode, false);
         if (string.IsNullOrEmpty(serObject.DebugMessage))
-            stream.WriteByte((byte)42);
+            stream.WriteByte(42);
         else
-            this.SerializeString(stream, serObject.DebugMessage, false);
-        this.SerializeParameterTable(stream, serObject.Parameters);
+            SerializeString(stream, serObject.DebugMessage, false);
+        SerializeParameterTable(stream, serObject.Parameters);
     }
 
     public override DisconnectMessage DeserializeDisconnectMessage(StreamBuffer stream)
     {
-        return new DisconnectMessage()
+        return new()
         {
-            Code = this.DeserializeShort(stream),
-            DebugMessage = this.Deserialize(stream, this.DeserializeByte(stream), IProtocol.DeserializationFlags.None) as string,
-            Parameters = this.DeserializeParameterTable(stream)
+            Code = DeserializeShort(stream),
+            DebugMessage = Deserialize(stream, DeserializeByte(stream), DeserializationFlags.None) as string,
+            Parameters = DeserializeParameterTable(stream)
         };
     }
 
-    public override OperationResponse DeserializeOperationResponse(
-      StreamBuffer stream,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+    public override OperationResponse DeserializeOperationResponse(StreamBuffer stream, DeserializationFlags flags = DeserializationFlags.None)
     {
-        return new OperationResponse()
+        return new()
         {
-            OperationCode = this.DeserializeByte(stream),
-            ReturnCode = this.DeserializeShort(stream),
-            DebugMessage = this.Deserialize(stream, this.DeserializeByte(stream), IProtocol.DeserializationFlags.None) as string,
-            Parameters = this.DeserializeParameterTable(stream)
+            OperationCode = DeserializeByte(stream),
+            ReturnCode = DeserializeShort(stream),
+            DebugMessage = Deserialize(stream, DeserializeByte(stream), DeserializationFlags.None) as string,
+            Parameters = DeserializeParameterTable(stream)
         };
     }
 
     public override void SerializeEventData(StreamBuffer stream, EventData serObject, bool setType)
     {
-        if (setType)
-            stream.WriteByte((byte)101);
+        if (setType) stream.WriteByte(101);
         stream.WriteByte(serObject.Code);
-        this.SerializeParameterTable(stream, serObject.Parameters);
+        SerializeParameterTable(stream, serObject.Parameters);
     }
 
-    public override EventData DeserializeEventData(
-      StreamBuffer din,
-      EventData target = null,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+    public override EventData DeserializeEventData(StreamBuffer din, EventData? target = null, DeserializationFlags flags = DeserializationFlags.None)
     {
-        EventData eventData;
-        if (target != null)
-        {
-            target.Reset();
-            eventData = target;
-        }
-        else
-            eventData = new EventData();
-        eventData.Code = this.DeserializeByte(din);
-        this.DeserializeParameterTable(din, eventData.Parameters);
+        EventData eventData = target ?? new EventData();
+        eventData.Code = DeserializeByte(din);
+        DeserializeParameterTable(din, eventData.Parameters);
         return eventData;
     }
 
-    private void SerializeParameterTable(StreamBuffer stream, Dictionary<byte, object> parameters)
+    private void SerializeParameterTable(StreamBuffer stream, Dictionary<byte, object?>? parameters)
     {
         if (parameters == null || parameters.Count == 0)
         {
-            this.SerializeShort(stream, (short)0, false);
+            SerializeShort(stream, 0, false);
         }
         else
         {
-            this.SerializeLengthAsShort(stream, parameters.Count, "ParameterTable");
-            foreach (KeyValuePair<byte, object> parameter in parameters)
+            SerializeLengthAsShort(stream, parameters.Count, "ParameterTable");
+            foreach (var parameter in parameters)
             {
                 stream.WriteByte(parameter.Key);
-                this.Serialize(stream, parameter.Value, true);
+                Serialize(stream, parameter.Value, true);
             }
         }
     }
 
-    private Dictionary<byte, object> DeserializeParameterTable(
-      StreamBuffer stream,
-      Dictionary<byte, object> target = null,
-      IProtocol.DeserializationFlags flag = DeserializationFlags.None)
+    private Dictionary<byte, object?> DeserializeParameterTable(StreamBuffer stream, Dictionary<byte, object?>? target = null, DeserializationFlags flag = DeserializationFlags.None)
     {
-        short capacity = this.DeserializeShort(stream);
-        Dictionary<byte, object> dictionary = target != null ? target : new Dictionary<byte, object>((int)capacity);
-        for (int index = 0; index < (int)capacity; ++index)
+        short capacity = DeserializeShort(stream);
+        Dictionary<byte, object?> dictionary = target ?? new Dictionary<byte, object?>(capacity);
+        for (int i = 0; i < capacity; i++)
         {
             byte key = stream.ReadByte();
-            object obj = this.Deserialize(stream, stream.ReadByte(), flag);
+            object? obj = Deserialize(stream, stream.ReadByte(), flag);
             dictionary[key] = obj;
         }
         return dictionary;
     }
 
-    public override void Serialize(StreamBuffer dout, object serObject, bool setType)
+    public override void Serialize(StreamBuffer dout, object? serObject, bool setType)
     {
         if (serObject == null)
         {
-            if (!setType)
-                return;
-            dout.WriteByte((byte)42);
+            if (!setType) return;
+            dout.WriteByte(42);
         }
         else
         {
             Type type = serObject is StructWrapper structWrapper ? structWrapper.ttype : serObject.GetType();
-            switch (this.GetCodeOfType(type))
+            switch (GetCodeOfType(type))
             {
-                case Protocol16.GpType.Dictionary:
-                    this.SerializeDictionary(dout, (IDictionary)serObject, setType);
+                case GpType.Dictionary:
+                    SerializeDictionary(dout, (IDictionary)serObject, setType);
                     break;
-                case Protocol16.GpType.Byte:
-                    this.SerializeByte(dout, serObject.Get<byte>(), setType);
+                case GpType.Byte:
+                    SerializeByte(dout, serObject.Get<byte>(), setType);
                     break;
-                case Protocol16.GpType.Double:
-                    this.SerializeDouble(dout, serObject.Get<double>(), setType);
+                case GpType.Double:
+                    SerializeDouble(dout, serObject.Get<double>(), setType);
                     break;
-                case Protocol16.GpType.EventData:
-                    this.SerializeEventData(dout, (EventData)serObject, setType);
+                case GpType.EventData:
+                    SerializeEventData(dout, (EventData)serObject, setType);
                     break;
-                case Protocol16.GpType.Float:
-                    this.SerializeFloat(dout, serObject.Get<float>(), setType);
+                case GpType.Float:
+                    SerializeFloat(dout, serObject.Get<float>(), setType);
                     break;
-                case Protocol16.GpType.Hashtable:
-                    this.SerializeHashTable(dout, (Hashtable)serObject, setType);
+                case GpType.Hashtable:
+                    SerializeHashTable(dout, (Hashtable)serObject, setType);
                     break;
-                case Protocol16.GpType.Integer:
-                    this.SerializeInteger(dout, serObject.Get<int>(), setType);
+                case GpType.Integer:
+                    SerializeInteger(dout, serObject.Get<int>(), setType);
                     break;
-                case Protocol16.GpType.Short:
-                    this.SerializeShort(dout, serObject.Get<short>(), setType);
+                case GpType.Short:
+                    SerializeShort(dout, serObject.Get<short>(), setType);
                     break;
-                case Protocol16.GpType.Long:
-                    this.SerializeLong(dout, serObject.Get<long>(), setType);
+                case GpType.Long:
+                    SerializeLong(dout, serObject.Get<long>(), setType);
                     break;
-                case Protocol16.GpType.Boolean:
-                    this.SerializeBoolean(dout, serObject.Get<bool>(), setType);
+                case GpType.Boolean:
+                    SerializeBoolean(dout, serObject.Get<bool>(), setType);
                     break;
-                case Protocol16.GpType.OperationResponse:
-                    this.SerializeOperationResponse(dout, (OperationResponse)serObject, setType);
+                case GpType.OperationResponse:
+                    SerializeOperationResponse(dout, (OperationResponse)serObject, setType);
                     break;
-                case Protocol16.GpType.OperationRequest:
-                    this.SerializeOperationRequest(dout, (OperationRequest)serObject, setType);
+                case GpType.OperationRequest:
+                    SerializeOperationRequest(dout, (OperationRequest)serObject, setType);
                     break;
-                case Protocol16.GpType.String:
-                    this.SerializeString(dout, (string)serObject, setType);
+                case GpType.String:
+                    SerializeString(dout, (string)serObject, setType);
                     break;
-                case Protocol16.GpType.ByteArray:
-                    this.SerializeByteArray(dout, (byte[])serObject, setType);
+                case GpType.ByteArray:
+                    SerializeByteArray(dout, (byte[])serObject, setType);
                     break;
-                case Protocol16.GpType.Array:
-                    if (serObject is int[])
+                case GpType.Array:
+                    if (serObject is int[] intArray)
                     {
-                        this.SerializeIntArrayOptimized(dout, (int[])serObject, setType);
-                        break;
+                        SerializeIntArrayOptimized(dout, intArray, setType);
                     }
-                    if (type.GetElementType() == typeof(object))
+                    else if (type.GetElementType() == typeof(object))
                     {
-                        this.SerializeObjectArray(dout, (IList)(serObject as object[]), setType);
-                        break;
+                        SerializeObjectArray(dout, (IList)(object[])serObject, setType);
                     }
-                    this.SerializeArray(dout, (Array)serObject, setType);
+                    else
+                    {
+                        SerializeArray(dout, (Array)serObject, setType);
+                    }
                     break;
-                case Protocol16.GpType.ObjectArray:
-                    this.SerializeObjectArray(dout, (IList)serObject, setType);
+                case GpType.ObjectArray:
+                    SerializeObjectArray(dout, (IList)serObject, setType);
                     break;
                 default:
                     if (serObject is ArraySegment<byte> arraySegment)
                     {
-                        this.SerializeByteArraySegment(dout, arraySegment.Array, arraySegment.Offset, arraySegment.Count, setType);
-                        break;
+                        SerializeByteArraySegment(dout, arraySegment.Array!, arraySegment.Offset, arraySegment.Count, setType);
                     }
-                    if (this.SerializeCustom(dout, serObject))
-                        break;
-                    if (serObject is StructWrapper)
-                        throw new Exception("cannot serialize(): StructWrapper<" + (serObject as StructWrapper).ttype.Name + ">");
-                    throw new Exception("cannot serialize(): " + type?.ToString());
+                    else if (!SerializeCustom(dout, serObject))
+                    {
+                        throw new Exception($"cannot serialize(): {type}");
+                    }
+                    break;
             }
         }
     }
 
     private void SerializeByte(StreamBuffer dout, byte serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)98);
+        if (setType) dout.WriteByte(98);
         dout.WriteByte(serObject);
     }
 
     private void SerializeBoolean(StreamBuffer dout, bool serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)111);
+        if (setType) dout.WriteByte(111);
         dout.WriteByte(serObject ? (byte)1 : (byte)0);
     }
 
     public override void SerializeShort(StreamBuffer dout, short serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)107);
-        lock (this.memShort)
+        if (setType) dout.WriteByte(107);
+        lock (memShort)
         {
-            byte[] memShort = this.memShort;
-            memShort[0] = (byte)((uint)serObject >> 8);
+            memShort[0] = (byte)(serObject >> 8);
             memShort[1] = (byte)serObject;
             dout.Write(memShort, 0, 2);
         }
@@ -430,24 +350,22 @@ public class Protocol16 : IProtocol
 
     public void SerializeLengthAsShort(StreamBuffer dout, int serObject, string type)
     {
-        if (serObject > (int)short.MaxValue || serObject < 0)
-            throw new NotSupportedException(string.Format("Exceeding 32767 (short.MaxValue) entries are not supported. Failed writing {0}. Length: {1}", (object)type, (object)serObject));
-        lock (this.memShort)
+        if (serObject > short.MaxValue || serObject < 0)
+            throw new NotSupportedException($"Exceeding 32767 (short.MaxValue) entries are not supported. Failed writing {type}. Length: {serObject}");
+        lock (memShort)
         {
-            byte[] memShort = this.memShort;
             memShort[0] = (byte)(serObject >> 8);
             memShort[1] = (byte)serObject;
             dout.Write(memShort, 0, 2);
         }
     }
 
+
     private void SerializeInteger(StreamBuffer dout, int serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)105);
-        lock (this.memInteger)
+        if (setType) dout.WriteByte(105);
+        lock (memInteger)
         {
-            byte[] memInteger = this.memInteger;
             memInteger[0] = (byte)(serObject >> 24);
             memInteger[1] = (byte)(serObject >> 16);
             memInteger[2] = (byte)(serObject >> 8);
@@ -458,27 +376,14 @@ public class Protocol16 : IProtocol
 
     private void SerializeLong(StreamBuffer dout, long serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)108);
-        lock (this.memLongBlock)
+        if (setType) dout.WriteByte(108);
+        lock (memLongBlock)
         {
-            this.memLongBlock[0] = serObject;
-            Buffer.BlockCopy((Array)this.memLongBlock, 0, (Array)this.memLongBlockBytes, 0, 8);
-            byte[] memLongBlockBytes = this.memLongBlockBytes;
+            memLongBlock[0] = serObject;
+            Buffer.BlockCopy(memLongBlock, 0, memLongBlockBytes, 0, 8);
             if (BitConverter.IsLittleEndian)
             {
-                byte num1 = memLongBlockBytes[0];
-                byte num2 = memLongBlockBytes[1];
-                byte num3 = memLongBlockBytes[2];
-                byte num4 = memLongBlockBytes[3];
-                memLongBlockBytes[0] = memLongBlockBytes[7];
-                memLongBlockBytes[1] = memLongBlockBytes[6];
-                memLongBlockBytes[2] = memLongBlockBytes[5];
-                memLongBlockBytes[3] = memLongBlockBytes[4];
-                memLongBlockBytes[4] = num4;
-                memLongBlockBytes[5] = num3;
-                memLongBlockBytes[6] = num2;
-                memLongBlockBytes[7] = num1;
+                Array.Reverse(memLongBlockBytes);
             }
             dout.Write(memLongBlockBytes, 0, 8);
         }
@@ -486,132 +391,100 @@ public class Protocol16 : IProtocol
 
     private void SerializeFloat(StreamBuffer dout, float serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)102);
-        lock (Protocol16.memFloatBlockBytes)
+        if (setType) dout.WriteByte(102);
+        lock (memFloatBlockBytes)
         {
-            Protocol16.memFloatBlock[0] = serObject;
-            Buffer.BlockCopy((Array)Protocol16.memFloatBlock, 0, (Array)Protocol16.memFloatBlockBytes, 0, 4);
+            memFloatBlock[0] = serObject;
+            Buffer.BlockCopy(memFloatBlock, 0, memFloatBlockBytes, 0, 4);
             if (BitConverter.IsLittleEndian)
             {
-                byte memFloatBlockByte1 = Protocol16.memFloatBlockBytes[0];
-                byte memFloatBlockByte2 = Protocol16.memFloatBlockBytes[1];
-                Protocol16.memFloatBlockBytes[0] = Protocol16.memFloatBlockBytes[3];
-                Protocol16.memFloatBlockBytes[1] = Protocol16.memFloatBlockBytes[2];
-                Protocol16.memFloatBlockBytes[2] = memFloatBlockByte2;
-                Protocol16.memFloatBlockBytes[3] = memFloatBlockByte1;
+                Array.Reverse(memFloatBlockBytes);
             }
-            dout.Write(Protocol16.memFloatBlockBytes, 0, 4);
+            dout.Write(memFloatBlockBytes, 0, 4);
         }
     }
 
     private void SerializeDouble(StreamBuffer dout, double serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)100);
-        lock (this.memDoubleBlockBytes)
+        if (setType) dout.WriteByte(100);
+        lock (memDoubleBlockBytes)
         {
-            this.memDoubleBlock[0] = serObject;
-            Buffer.BlockCopy((Array)this.memDoubleBlock, 0, (Array)this.memDoubleBlockBytes, 0, 8);
-            byte[] doubleBlockBytes = this.memDoubleBlockBytes;
+            memDoubleBlock[0] = serObject;
+            Buffer.BlockCopy(memDoubleBlock, 0, memDoubleBlockBytes, 0, 8);
             if (BitConverter.IsLittleEndian)
             {
-                byte num1 = doubleBlockBytes[0];
-                byte num2 = doubleBlockBytes[1];
-                byte num3 = doubleBlockBytes[2];
-                byte num4 = doubleBlockBytes[3];
-                doubleBlockBytes[0] = doubleBlockBytes[7];
-                doubleBlockBytes[1] = doubleBlockBytes[6];
-                doubleBlockBytes[2] = doubleBlockBytes[5];
-                doubleBlockBytes[3] = doubleBlockBytes[4];
-                doubleBlockBytes[4] = num4;
-                doubleBlockBytes[5] = num3;
-                doubleBlockBytes[6] = num2;
-                doubleBlockBytes[7] = num1;
+                Array.Reverse(memDoubleBlockBytes);
             }
-            dout.Write(doubleBlockBytes, 0, 8);
+            dout.Write(memDoubleBlockBytes, 0, 8);
         }
     }
 
     public override void SerializeString(StreamBuffer stream, string value, bool setType)
     {
-        if (setType)
-            stream.WriteByte((byte)115);
+        if (setType) stream.WriteByte(115);
         int byteCount = Encoding.UTF8.GetByteCount(value);
-        if (byteCount > (int)short.MaxValue)
-            throw new NotSupportedException("Strings that exceed a UTF8-encoded byte-length of 32767 (short.MaxValue) are not supported. Yours is: " + byteCount.ToString());
-        this.SerializeLengthAsShort(stream, byteCount, "String");
+        if (byteCount > short.MaxValue)
+            throw new NotSupportedException($"Strings that exceed a UTF8-encoded byte-length of 32767 (short.MaxValue) are not supported. Yours is: {byteCount}");
+        SerializeLengthAsShort(stream, byteCount, "String");
         int offset = 0;
-        byte[] bufferAndAdvance = stream.GetBufferAndAdvance(byteCount, out offset);
-        Encoding.UTF8.GetBytes(value, 0, value.Length, bufferAndAdvance, offset);
+        byte[] buffer = stream.GetBufferAndAdvance(byteCount, out offset);
+        Encoding.UTF8.GetBytes(value, 0, value.Length, buffer, offset);
     }
 
     private void SerializeArray(StreamBuffer dout, Array serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)121);
-        this.SerializeLengthAsShort(dout, serObject.Length, "Array");
-        Type elementType = serObject.GetType().GetElementType();
-        Protocol16.GpType codeOfType = this.GetCodeOfType(elementType);
+        if (setType) dout.WriteByte(121);
+        SerializeLengthAsShort(dout, serObject.Length, "Array");
+        Type? elementType = serObject.GetType().GetElementType();
+        ArgumentNullException.ThrowIfNull(elementType);
+        GpType codeOfType = GetCodeOfType(elementType);
+
         if (codeOfType != 0)
         {
             dout.WriteByte((byte)codeOfType);
-            if (codeOfType == Protocol16.GpType.Dictionary)
+            if (codeOfType == GpType.Dictionary)
             {
-                bool setKeyType;
-                bool setValueType;
-                this.SerializeDictionaryHeader(dout, (object)serObject, out setKeyType, out setValueType);
-                for (int index = 0; index < serObject.Length; ++index)
+                SerializeDictionaryHeader(dout, serObject, out bool setKeyType, out bool setValueType);
+                foreach (var item in serObject)
                 {
-                    object dict = serObject.GetValue(index);
-                    this.SerializeDictionaryElements(dout, dict, setKeyType, setValueType);
+                    SerializeDictionaryElements(dout, (IDictionary)item, setKeyType, setValueType);
                 }
             }
             else
             {
-                for (int index = 0; index < serObject.Length; ++index)
+                foreach (var item in serObject)
                 {
-                    object serObject1 = serObject.GetValue(index);
-                    this.Serialize(dout, serObject1, false);
+                    Serialize(dout, item, false);
                 }
             }
         }
         else
         {
-            CustomType customType;
-            if (!Protocol.TypeDict.TryGetValue(elementType, out customType))
-                throw new NotSupportedException("cannot serialize array of type " + elementType?.ToString());
-            dout.WriteByte((byte)99);
+            if (!Protocol.TypeDict.TryGetValue(elementType, out CustomType? customType))
+                throw new NotSupportedException($"cannot serialize array of type {elementType}");
+
+            dout.WriteByte(99);
             dout.WriteByte(customType.Code);
-            for (int index = 0; index < serObject.Length; ++index)
+            foreach (var item in serObject)
             {
-                object customObject = serObject.GetValue(index);
-                byte code;
                 if (customType.SerializeStreamFunction == null)
                 {
-                    byte[] buffer = customType.SerializeFunction(customObject);
-                    StreamBuffer dout1 = dout;
-                    int length = buffer.Length;
-                    code = customType.Code;
-                    string type = "Custom Type " + code.ToString();
-                    this.SerializeLengthAsShort(dout1, length, type);
+                    byte[] buffer = customType.SerializeFunction!(item);
+                    SerializeLengthAsShort(dout, buffer.Length, $"Custom Type {customType.Code}");
                     dout.Write(buffer, 0, buffer.Length);
                 }
                 else
                 {
                     int position1 = dout.Position;
                     dout.Position += 2;
-                    short num = customType.SerializeStreamFunction(dout, customObject);
-                    long position2 = (long)dout.Position;
+                    short length = customType.SerializeStreamFunction(dout, item);
+                    long position2 = dout.Position;
                     dout.Position = position1;
-                    StreamBuffer dout2 = dout;
-                    int serObject2 = (int)num;
-                    code = customType.Code;
-                    string type = "Custom Type " + code.ToString();
-                    this.SerializeLengthAsShort(dout2, serObject2, type);
-                    dout.Position += (int)num;
-                    if ((long)dout.Position != position2)
-                        throw new Exception("Serialization failed. Stream position corrupted. Should be " + position2.ToString() + " is now: " + dout.Position.ToString() + " serializedLength: " + num.ToString());
+                    SerializeLengthAsShort(dout, length, $"Custom Type {customType.Code}");
+                    dout.Position += length;
+
+                    if (dout.Position != position2)
+                        throw new Exception($"Serialization failed. Stream position corrupted. Should be {position2} is now: {dout.Position} serializedLength: {length}");
                 }
             }
         }
@@ -619,379 +492,271 @@ public class Protocol16 : IProtocol
 
     private void SerializeByteArray(StreamBuffer dout, byte[] serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)120);
-        this.SerializeInteger(dout, serObject.Length, false);
+        if (setType) dout.WriteByte(120);
+        SerializeInteger(dout, serObject.Length, false);
         dout.Write(serObject, 0, serObject.Length);
     }
 
-    private void SerializeByteArraySegment(
-      StreamBuffer dout,
-      byte[] serObject,
-      int offset,
-      int count,
-      bool setType)
+    private void SerializeByteArraySegment(StreamBuffer dout, byte[] serObject, int offset, int count, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)120);
-        this.SerializeInteger(dout, count, false);
+        if (setType) dout.WriteByte(120);
+        SerializeInteger(dout, count, false);
         dout.Write(serObject, offset, count);
     }
 
-    private void SerializeIntArrayOptimized(StreamBuffer inWriter, int[] serObject, bool setType)
+    private void SerializeIntArrayOptimized(StreamBuffer dout, int[] serObject, bool setType)
     {
-        if (setType)
-            inWriter.WriteByte((byte)121);
-        this.SerializeLengthAsShort(inWriter, serObject.Length, "int[]");
-        inWriter.WriteByte((byte)105);
+        if (setType) dout.WriteByte(121);
+        SerializeLengthAsShort(dout, serObject.Length, "int[]");
+        dout.WriteByte(105);
         byte[] buffer = new byte[serObject.Length * 4];
-        int num1 = 0;
-        for (int index1 = 0; index1 < serObject.Length; ++index1)
+        for (int i = 0, j = 0; i < serObject.Length; i++, j += 4)
         {
-            byte[] numArray1 = buffer;
-            int index2 = num1;
-            int num2 = index2 + 1;
-            int num3 = (int)(byte)(serObject[index1] >> 24);
-            numArray1[index2] = (byte)num3;
-            byte[] numArray2 = buffer;
-            int index3 = num2;
-            int num4 = index3 + 1;
-            int num5 = (int)(byte)(serObject[index1] >> 16);
-            numArray2[index3] = (byte)num5;
-            byte[] numArray3 = buffer;
-            int index4 = num4;
-            int num6 = index4 + 1;
-            int num7 = (int)(byte)(serObject[index1] >> 8);
-            numArray3[index4] = (byte)num7;
-            byte[] numArray4 = buffer;
-            int index5 = num6;
-            num1 = index5 + 1;
-            int num8 = (int)(byte)serObject[index1];
-            numArray4[index5] = (byte)num8;
+            buffer[j] = (byte)(serObject[i] >> 24);
+            buffer[j + 1] = (byte)(serObject[i] >> 16);
+            buffer[j + 2] = (byte)(serObject[i] >> 8);
+            buffer[j + 3] = (byte)serObject[i];
         }
-        inWriter.Write(buffer, 0, buffer.Length);
+        dout.Write(buffer, 0, buffer.Length);
     }
 
     private void SerializeStringArray(StreamBuffer dout, string[] serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)97);
-        this.SerializeLengthAsShort(dout, serObject.Length, "string[]");
-        for (int index = 0; index < serObject.Length; ++index)
-            this.SerializeString(dout, serObject[index], false);
+        if (setType) dout.WriteByte(97);
+        SerializeLengthAsShort(dout, serObject.Length, "string[]");
+        foreach (var str in serObject)
+        {
+            SerializeString(dout, str, false);
+        }
     }
 
     private void SerializeObjectArray(StreamBuffer dout, IList objects, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)122);
-        this.SerializeLengthAsShort(dout, objects.Count, "object[]");
-        for (int index = 0; index < objects.Count; ++index)
+        if (setType) dout.WriteByte(122);
+        SerializeLengthAsShort(dout, objects.Count, "object[]");
+        foreach (var obj in objects)
         {
-            object serObject = objects[index];
-            this.Serialize(dout, serObject, true);
+            Serialize(dout, obj, true);
         }
     }
 
     private void SerializeHashTable(StreamBuffer dout, Hashtable serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)104);
-        this.SerializeLengthAsShort(dout, serObject.Count, "Hashtable");
-        foreach (object key in serObject.Keys)
+        if (setType) dout.WriteByte(104);
+        SerializeLengthAsShort(dout, serObject.Count, "Hashtable");
+        foreach (DictionaryEntry entry in serObject)
         {
-            this.Serialize(dout, key, true);
-            this.Serialize(dout, serObject[key], true);
+            Serialize(dout, entry.Key, true);
+            Serialize(dout, entry.Value, true);
         }
     }
 
     private void SerializeDictionary(StreamBuffer dout, IDictionary serObject, bool setType)
     {
-        if (setType)
-            dout.WriteByte((byte)68);
-        bool setKeyType;
-        bool setValueType;
-        this.SerializeDictionaryHeader(dout, (object)serObject, out setKeyType, out setValueType);
-        this.SerializeDictionaryElements(dout, (object)serObject, setKeyType, setValueType);
+        if (setType) dout.WriteByte(68);
+        SerializeDictionaryHeader(dout, serObject, out bool setKeyType, out bool setValueType);
+        SerializeDictionaryElements(dout, serObject, setKeyType, setValueType);
     }
 
-    private void SerializeDictionaryHeader(StreamBuffer writer, Type dictType)
-    {
-        this.SerializeDictionaryHeader(writer, (object)dictType, out bool _, out bool _);
-    }
-
-    private void SerializeDictionaryHeader(
-      StreamBuffer writer,
-      object dict,
-      out bool setKeyType,
-      out bool setValueType)
+    private void SerializeDictionaryHeader(StreamBuffer writer, object dict, out bool setKeyType, out bool setValueType)
     {
         Type[] genericArguments = dict.GetType().GetGenericArguments();
         setKeyType = genericArguments[0] == typeof(object);
         setValueType = genericArguments[1] == typeof(object);
-        if (setKeyType)
+
+        writer.WriteByte(setKeyType ? (byte)0 : (byte)GetCodeOfType(genericArguments[0]));
+        writer.WriteByte(setValueType ? (byte)0 : (byte)GetCodeOfType(genericArguments[1]));
+
+        if (!setValueType && GetCodeOfType(genericArguments[1]) == GpType.Dictionary)
         {
-            writer.WriteByte((byte)0);
-        }
-        else
-        {
-            Protocol16.GpType codeOfType = this.GetCodeOfType(genericArguments[0]);
-            if (codeOfType == Protocol16.GpType.Unknown || codeOfType == Protocol16.GpType.Dictionary)
-                throw new Exception("Unexpected - cannot serialize Dictionary with key type: " + genericArguments[0]?.ToString());
-            writer.WriteByte((byte)codeOfType);
-        }
-        if (setValueType)
-        {
-            writer.WriteByte((byte)0);
-        }
-        else
-        {
-            Protocol16.GpType codeOfType = this.GetCodeOfType(genericArguments[1]);
-            if (codeOfType == Protocol16.GpType.Unknown)
-                throw new Exception("Unexpected - cannot serialize Dictionary with value type: " + genericArguments[1]?.ToString());
-            writer.WriteByte((byte)codeOfType);
-            if (codeOfType == Protocol16.GpType.Dictionary)
-                this.SerializeDictionaryHeader(writer, genericArguments[1]);
+            SerializeDictionaryHeader(writer, genericArguments[1]);
         }
     }
 
-    private void SerializeDictionaryElements(
-      StreamBuffer writer,
-      object dict,
-      bool setKeyType,
-      bool setValueType)
+    private void SerializeDictionaryHeader(StreamBuffer writer, Type dictType)
     {
-        IDictionary dictionary = (IDictionary)dict;
-        this.SerializeLengthAsShort(writer, dictionary.Count, "Dictionary elements");
-        foreach (DictionaryEntry dictionaryEntry in dictionary)
+        SerializeDictionaryHeader(writer, (object)dictType, out bool _, out bool _);
+    }
+
+    private void SerializeDictionaryElements(StreamBuffer writer, IDictionary dictionary, bool setKeyType, bool setValueType)
+    {
+        SerializeLengthAsShort(writer, dictionary.Count, "Dictionary elements");
+        foreach (DictionaryEntry entry in dictionary)
         {
-            if (!setValueType && dictionaryEntry.Value == null)
-                throw new Exception("Can't serialize null in Dictionary with specific value-type.");
-            if (!setKeyType && dictionaryEntry.Key == null)
-                throw new Exception("Can't serialize null in Dictionary with specific key-type.");
-            this.Serialize(writer, dictionaryEntry.Key, setKeyType);
-            this.Serialize(writer, dictionaryEntry.Value, setValueType);
+            if (!setKeyType && entry.Key == null) throw new Exception("Can't serialize null in Dictionary with specific key-type.");
+            if (!setValueType && entry.Value == null) throw new Exception("Can't serialize null in Dictionary with specific value-type.");
+            Serialize(writer, entry.Key, setKeyType);
+            Serialize(writer, entry.Value, setValueType);
         }
     }
 
-    public override object Deserialize(
-      StreamBuffer din,
-      byte type,
-      IProtocol.DeserializationFlags flags = IProtocol.DeserializationFlags.None)
+    public override object? Deserialize(StreamBuffer din, byte type, DeserializationFlags flags = DeserializationFlags.None)
     {
-        switch (type)
+        return type switch
         {
-            case 0:
-            case 42:
-                return (object)null;
-            case 68:
-                return (object)this.DeserializeDictionary(din);
-            case 97:
-                return (object)this.DeserializeStringArray(din);
-            case 98:
-                return (object)this.DeserializeByte(din);
-            case 99:
-                byte customTypeCode = din.ReadByte();
-                return this.DeserializeCustom(din, customTypeCode);
-            case 100:
-                return (object)this.DeserializeDouble(din);
-            case 101:
-                return (object)this.DeserializeEventData(din, (EventData)null, IProtocol.DeserializationFlags.None);
-            case 102:
-                return (object)this.DeserializeFloat(din);
-            case 104:
-                return (object)this.DeserializeHashTable(din);
-            case 105:
-                return (object)this.DeserializeInteger(din);
-            case 107:
-                return (object)this.DeserializeShort(din);
-            case 108:
-                return (object)this.DeserializeLong(din);
-            case 110:
-                return (object)this.DeserializeIntArray(din);
-            case 111:
-                return (object)this.DeserializeBoolean(din);
-            case 112:
-                return (object)this.DeserializeOperationResponse(din, flags);
-            case 113:
-                return (object)this.DeserializeOperationRequest(din, flags);
-            case 115:
-                return (object)this.DeserializeString(din);
-            case 120:
-                return (object)this.DeserializeByteArray(din);
-            case 121:
-                return (object)this.DeserializeArray(din);
-            case 122:
-                return (object)this.DeserializeObjectArray(din);
-            default:
-                throw new Exception("Deserialize(): " + type.ToString() + " pos: " + din.Position.ToString() + " bytes: " + din.Length.ToString() + ". " + BitConverter.ToString(din.GetBuffer()));
-        }
+            0 or 42 => null,
+            68 => DeserializeDictionary(din),
+            97 => DeserializeStringArray(din),
+            98 => DeserializeByte(din),
+            99 => DeserializeCustom(din, din.ReadByte()),
+            100 => DeserializeDouble(din),
+            101 => DeserializeEventData(din, null, DeserializationFlags.None),
+            102 => DeserializeFloat(din),
+            104 => DeserializeHashTable(din),
+            105 => DeserializeInteger(din),
+            107 => DeserializeShort(din),
+            108 => DeserializeLong(din),
+            110 => DeserializeIntArray(din),
+            111 => DeserializeBoolean(din),
+            112 => DeserializeOperationResponse(din, flags),
+            113 => DeserializeOperationRequest(din, flags),
+            115 => DeserializeString(din),
+            120 => DeserializeByteArray(din),
+            121 => DeserializeArray(din),
+            122 => DeserializeObjectArray(din),
+            _ => throw new Exception($"Deserialize(): {type} pos: {din.Position} bytes: {din.Length}. {BitConverter.ToString(din.GetBuffer())}")
+        };
     }
 
     public override byte DeserializeByte(StreamBuffer din) => din.ReadByte();
 
-    private bool DeserializeBoolean(StreamBuffer din) => din.ReadByte() > (byte)0;
+    private bool DeserializeBoolean(StreamBuffer din) => din.ReadByte() > 0;
 
     public override short DeserializeShort(StreamBuffer din)
     {
-        lock (this.memShort)
+        lock (memShort)
         {
-            byte[] memShort = this.memShort;
             din.Read(memShort, 0, 2);
-            return (short)((int)memShort[0] << 8 | (int)memShort[1]);
+            return (short)((memShort[0] << 8) | memShort[1]);
         }
     }
 
     private int DeserializeInteger(StreamBuffer din)
     {
-        lock (this.memInteger)
+        lock (memInteger)
         {
-            byte[] memInteger = this.memInteger;
             din.Read(memInteger, 0, 4);
-            return (int)memInteger[0] << 24 | (int)memInteger[1] << 16 | (int)memInteger[2] << 8 | (int)memInteger[3];
+            return (memInteger[0] << 24) | (memInteger[1] << 16) | (memInteger[2] << 8) | memInteger[3];
         }
     }
 
     private long DeserializeLong(StreamBuffer din)
     {
-        lock (this.memLong)
+        lock (memLong)
         {
-            byte[] memLong = this.memLong;
             din.Read(memLong, 0, 8);
-            return BitConverter.IsLittleEndian ? (long)memLong[0] << 56 | (long)memLong[1] << 48 | (long)memLong[2] << 40 | (long)memLong[3] << 32 | (long)memLong[4] << 24 | (long)memLong[5] << 16 | (long)memLong[6] << 8 | (long)memLong[7] : BitConverter.ToInt64(memLong, 0);
+            if (BitConverter.IsLittleEndian) Array.Reverse(memLong);
+            return BitConverter.ToInt64(memLong, 0);
         }
     }
 
     private float DeserializeFloat(StreamBuffer din)
     {
-        lock (this.memFloat)
+        lock (memFloat)
         {
-            byte[] memFloat = this.memFloat;
             din.Read(memFloat, 0, 4);
-            if (BitConverter.IsLittleEndian)
-            {
-                byte num1 = memFloat[0];
-                byte num2 = memFloat[1];
-                memFloat[0] = memFloat[3];
-                memFloat[1] = memFloat[2];
-                memFloat[2] = num2;
-                memFloat[3] = num1;
-            }
+            if (BitConverter.IsLittleEndian) Array.Reverse(memFloat);
             return BitConverter.ToSingle(memFloat, 0);
         }
     }
 
     private double DeserializeDouble(StreamBuffer din)
     {
-        lock (this.memDouble)
+        lock (memDouble)
         {
-            byte[] memDouble = this.memDouble;
             din.Read(memDouble, 0, 8);
-            if (BitConverter.IsLittleEndian)
-            {
-                byte num1 = memDouble[0];
-                byte num2 = memDouble[1];
-                byte num3 = memDouble[2];
-                byte num4 = memDouble[3];
-                memDouble[0] = memDouble[7];
-                memDouble[1] = memDouble[6];
-                memDouble[2] = memDouble[5];
-                memDouble[3] = memDouble[4];
-                memDouble[4] = num4;
-                memDouble[5] = num3;
-                memDouble[6] = num2;
-                memDouble[7] = num1;
-            }
+            if (BitConverter.IsLittleEndian) Array.Reverse(memDouble);
             return BitConverter.ToDouble(memDouble, 0);
         }
     }
 
     private string DeserializeString(StreamBuffer din)
     {
-        short num = this.DeserializeShort(din);
-        if (num == (short)0)
-            return string.Empty;
-        if (num < (short)0)
-            throw new NotSupportedException("Received string type with unsupported length: " + num.ToString());
+        short length = DeserializeShort(din);
+        if (length == 0) return string.Empty;
+        if (length < 0) throw new NotSupportedException($"Received string type with unsupported length: {length}");
         int offset = 0;
-        return Encoding.UTF8.GetString(din.GetBufferAndAdvance((int)num, out offset), offset, (int)num);
+        return Encoding.UTF8.GetString(din.GetBufferAndAdvance(length, out offset), offset, length);
     }
 
     private Array DeserializeArray(StreamBuffer din)
     {
-        short num1 = this.DeserializeShort(din);
-        byte num2 = din.ReadByte();
-        Array array1;
-        switch (num2)
+        short length = DeserializeShort(din);
+        byte typeCode = din.ReadByte();
+
+        return typeCode switch
         {
-            case 68:
-                Array arrayResult = (Array)null;
-                this.DeserializeDictionaryArray(din, num1, out arrayResult);
-                return arrayResult;
-            case 98:
-                array1 = (Array)this.DeserializeByteArray(din, (int)num1);
-                break;
-            case 99:
-                byte key = din.ReadByte();
-                CustomType customType;
-                if (!Protocol.CodeDict.TryGetValue(key, out customType))
-                    throw new Exception("Cannot find deserializer for custom type: " + key.ToString());
-                array1 = Array.CreateInstance(customType.Type, (int)num1);
-                for (int index = 0; index < (int)num1; ++index)
-                {
-                    short length = this.DeserializeShort(din);
-                    if (length < (short)0)
-                        throw new InvalidDataException("DeserializeArray read negative objLength value: " + length.ToString() + " before position: " + din.Position.ToString());
-                    if (customType.DeserializeStreamFunction == null)
-                    {
-                        byte[] numArray = new byte[(int)length];
-                        din.Read(numArray, 0, (int)length);
-                        array1.SetValue(customType.DeserializeFunction(numArray), index);
-                    }
-                    else
-                    {
-                        int position = din.Position;
-                        object obj = customType.DeserializeStreamFunction(din, length);
-                        if (din.Position - position != (int)length)
-                            din.Position = position + (int)length;
-                        array1.SetValue(obj, index);
-                    }
-                }
-                break;
-            case 105:
-                array1 = (Array)this.DeserializeIntArray(din, (int)num1);
-                break;
-            case 120:
-                array1 = Array.CreateInstance(typeof(byte[]), (int)num1);
-                for (short index = 0; (int)index < (int)num1; ++index)
-                {
-                    Array array2 = (Array)this.DeserializeByteArray(din);
-                    array1.SetValue((object)array2, (int)index);
-                }
-                break;
-            case 121:
-                Array array3 = this.DeserializeArray(din);
-                array1 = Array.CreateInstance(array3.GetType(), (int)num1);
-                array1.SetValue((object)array3, 0);
-                for (short index = 1; (int)index < (int)num1; ++index)
-                {
-                    Array array4 = this.DeserializeArray(din);
-                    array1.SetValue((object)array4, (int)index);
-                }
-                break;
-            default:
-                array1 = this.CreateArrayByType(num2, num1);
-                for (short index = 0; (int)index < (int)num1; ++index)
-                    array1.SetValue(this.Deserialize(din, num2, IProtocol.DeserializationFlags.None), (int)index);
-                break;
+            68 => DeserializeDictionaryArray(din, length, out Array arrayResult) ? arrayResult : throw new Exception("Failed to deserialize dictionary array"),
+            98 => DeserializeByteArray(din, length),
+            99 => DeserializeCustomArray(din, length, din.ReadByte()),
+            105 => DeserializeIntArray(din, length),
+            120 => DeserializeByteArrayOfArrays(din, length),
+            121 => DeserializeNestedArray(din, length),
+            _ => DeserializeSimpleArray(din, typeCode, length)
+        };
+    }
+
+    private Array DeserializeCustomArray(StreamBuffer din, short length, byte customTypeCode)
+    {
+        if (!Protocol.CodeDict.TryGetValue(customTypeCode, out CustomType? customType))
+            throw new Exception($"Cannot find deserializer for custom type: {customTypeCode}");
+
+        Array array = Array.CreateInstance(customType.Type, length);
+        for (int i = 0; i < length; i++)
+        {
+            short len = DeserializeShort(din);
+            if (len < 0) throw new InvalidDataException($"DeserializeArray read negative objLength value: {len} before position: {din.Position}");
+            if (customType.DeserializeStreamFunction == null)
+            {
+                byte[] buffer = new byte[len];
+                din.Read(buffer, 0, len);
+                array.SetValue(customType.DeserializeFunction!(buffer), i);
+            }
+            else
+            {
+                int position = din.Position;
+                object obj = customType.DeserializeStreamFunction(din, len);
+                if (din.Position - position != len)
+                    din.Position = position + len;
+                array.SetValue(obj, i);
+            }
         }
-        return array1;
+        return array;
+    }
+
+    private Array DeserializeByteArrayOfArrays(StreamBuffer din, short length)
+    {
+        Array array = Array.CreateInstance(typeof(byte[]), length);
+        for (int i = 0; i < length; i++)
+        {
+            array.SetValue(DeserializeByteArray(din), i);
+        }
+        return array;
+    }
+
+    private Array DeserializeNestedArray(StreamBuffer din, short length)
+    {
+        Array array = Array.CreateInstance(typeof(Array), length);
+        for (int i = 0; i < length; i++)
+        {
+            array.SetValue(DeserializeArray(din), i);
+        }
+        return array;
+    }
+
+    private Array DeserializeSimpleArray(StreamBuffer din, byte typeCode, short length)
+    {
+        Array array = CreateArrayByType(typeCode, length);
+        for (int i = 0; i < length; i++)
+        {
+            array.SetValue(Deserialize(din, typeCode, IProtocol.DeserializationFlags.None), i);
+        }
+        return array;
     }
 
     private byte[] DeserializeByteArray(StreamBuffer din, int size = -1)
     {
-        if (size == -1)
-            size = this.DeserializeInteger(din);
+        if (size == -1) size = DeserializeInteger(din);
         byte[] buffer = new byte[size];
         din.Read(buffer, 0, size);
         return buffer;
@@ -999,158 +764,126 @@ public class Protocol16 : IProtocol
 
     private int[] DeserializeIntArray(StreamBuffer din, int size = -1)
     {
-        if (size == -1)
-            size = this.DeserializeInteger(din);
-        int[] numArray = new int[size];
-        for (int index = 0; index < size; ++index)
-            numArray[index] = this.DeserializeInteger(din);
-        return numArray;
+        if (size == -1) size = DeserializeInteger(din);
+        int[] array = new int[size];
+        for (int i = 0; i < size; i++)
+        {
+            array[i] = DeserializeInteger(din);
+        }
+        return array;
     }
 
     private string[] DeserializeStringArray(StreamBuffer din)
     {
-        int length = (int)this.DeserializeShort(din);
-        string[] strArray = new string[length];
-        for (int index = 0; index < length; ++index)
-            strArray[index] = this.DeserializeString(din);
-        return strArray;
+        int length = DeserializeShort(din);
+        string[] array = new string[length];
+        for (int i = 0; i < length; i++)
+        {
+            array[i] = DeserializeString(din);
+        }
+        return array;
     }
 
-    private object[] DeserializeObjectArray(StreamBuffer din)
+    private object?[] DeserializeObjectArray(StreamBuffer din)
     {
-        short length = this.DeserializeShort(din);
-        object[] objArray = new object[(int)length];
-        for (int index = 0; index < (int)length; ++index)
+        short length = DeserializeShort(din);
+        object?[] array = new object[length];
+        for (int i = 0; i < length; i++)
         {
-            byte type = din.ReadByte();
-            objArray[index] = this.Deserialize(din, type, IProtocol.DeserializationFlags.None);
+            array[i] = Deserialize(din, din.ReadByte(), DeserializationFlags.None);
         }
-        return objArray;
+        return array;
     }
 
     private Hashtable DeserializeHashTable(StreamBuffer din)
     {
-        int x = (int)this.DeserializeShort(din);
-        Hashtable hashtable = new Hashtable(x);
-        for (int index = 0; index < x; ++index)
+        int count = DeserializeShort(din);
+        Hashtable hashtable = new Hashtable(count);
+        for (int i = 0; i < count; i++)
         {
-            object key = this.Deserialize(din, din.ReadByte(), IProtocol.DeserializationFlags.None);
-            object obj = this.Deserialize(din, din.ReadByte(), IProtocol.DeserializationFlags.None);
+            object? key = Deserialize(din, din.ReadByte(), DeserializationFlags.None);
+            object? value = Deserialize(din, din.ReadByte(), DeserializationFlags.None);
+            if (key == null)
+                continue;
             if (key != null)
-                hashtable[key] = obj;
+            {
+                hashtable[key] = value;
+            }
         }
         return hashtable;
     }
 
-    private IDictionary DeserializeDictionary(StreamBuffer din)
+    private IDictionary? DeserializeDictionary(StreamBuffer din)
     {
-        byte typeCode1 = din.ReadByte();
-        byte typeCode2 = din.ReadByte();
-        if (typeCode1 == (byte)68 || typeCode1 == (byte)121)
+        byte keyTypeCode = din.ReadByte();
+        byte valueTypeCode = din.ReadByte();
+        if (keyTypeCode == 68 || keyTypeCode == 121)
             throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary keys.");
-        if (typeCode2 == (byte)68 || typeCode2 == (byte)121)
+        if (valueTypeCode == 68 || valueTypeCode == 121)
             throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary values.");
-        int num = (int)this.DeserializeShort(din);
-        bool flag1 = typeCode1 == (byte)0 || typeCode1 == (byte)42;
-        bool flag2 = typeCode2 == (byte)0 || typeCode2 == (byte)42;
-        IDictionary instance = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(this.GetTypeOfCode(typeCode1), this.GetTypeOfCode(typeCode2))) as IDictionary;
-        for (int index = 0; index < num; ++index)
+
+        int count = DeserializeShort(din);
+        bool dynamicKeyType = keyTypeCode == 0 || keyTypeCode == 42;
+        bool dynamicValueType = valueTypeCode == 0 || valueTypeCode == 42;
+
+        IDictionary? dictionary = (IDictionary?)Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(GetTypeOfCode(keyTypeCode), GetTypeOfCode(valueTypeCode)));
+        for (int i = 0; i < count; i++)
         {
-            object key = this.Deserialize(din, flag1 ? din.ReadByte() : typeCode1, IProtocol.DeserializationFlags.None);
-            object obj = this.Deserialize(din, flag2 ? din.ReadByte() : typeCode2, IProtocol.DeserializationFlags.None);
+            object? key = Deserialize(din, dynamicKeyType ? din.ReadByte() : keyTypeCode, DeserializationFlags.None);
+            object? value = Deserialize(din, dynamicValueType ? din.ReadByte() : valueTypeCode, DeserializationFlags.None);
+            if (key == null)
+                continue;
             if (key != null)
-                instance.Add(key, obj);
+            {
+                dictionary?.Add(key, value);
+            }
         }
-        return instance;
+        return dictionary;
     }
 
     private bool DeserializeDictionaryArray(StreamBuffer din, short size, out Array arrayResult)
     {
-        byte keyTypeCode;
-        byte valTypeCode;
-        Type type1 = this.DeserializeDictionaryType(din, out keyTypeCode, out valTypeCode);
-        arrayResult = Array.CreateInstance(type1, (int)size);
-        for (short index1 = 0; (int)index1 < (int)size; ++index1)
+        byte keyTypeCode, valueTypeCode;
+        Type dictType = DeserializeDictionaryType(din, out keyTypeCode, out valueTypeCode);
+        arrayResult = Array.CreateInstance(dictType, size);
+
+        for (int i = 0; i < size; i++)
         {
-            if (!(Activator.CreateInstance(type1) is IDictionary instance))
+            if (!(Activator.CreateInstance(dictType) is IDictionary dictionary))
                 return false;
-            short num = this.DeserializeShort(din);
-            for (int index2 = 0; index2 < (int)num; ++index2)
+
+            short count = DeserializeShort(din);
+            for (int j = 0; j < count; j++)
             {
-                object key;
-                if (keyTypeCode > (byte)0)
-                {
-                    key = this.Deserialize(din, keyTypeCode, IProtocol.DeserializationFlags.None);
-                }
-                else
-                {
-                    byte type2 = din.ReadByte();
-                    key = this.Deserialize(din, type2, IProtocol.DeserializationFlags.None);
-                }
-                object obj;
-                if (valTypeCode > (byte)0)
-                {
-                    obj = this.Deserialize(din, valTypeCode, IProtocol.DeserializationFlags.None);
-                }
-                else
-                {
-                    byte type3 = din.ReadByte();
-                    obj = this.Deserialize(din, type3, IProtocol.DeserializationFlags.None);
-                }
+                object? key = keyTypeCode > 0 ? Deserialize(din, keyTypeCode, DeserializationFlags.None) : Deserialize(din, din.ReadByte(), DeserializationFlags.None);
+                object? value = valueTypeCode > 0 ? Deserialize(din, valueTypeCode, DeserializationFlags.None) : Deserialize(din, din.ReadByte(), DeserializationFlags.None);
                 if (key != null)
-                    instance.Add(key, obj);
+                {
+                    dictionary.Add(key, value);
+                }
             }
-            arrayResult.SetValue((object)instance, (int)index1);
+            arrayResult.SetValue(dictionary, i);
         }
         return true;
     }
 
-    private Type DeserializeDictionaryType(
-      StreamBuffer reader,
-      out byte keyTypeCode,
-      out byte valTypeCode)
+    private Type DeserializeDictionaryType(StreamBuffer reader, out byte keyTypeCode, out byte valueTypeCode)
     {
         keyTypeCode = reader.ReadByte();
-        valTypeCode = reader.ReadByte();
-        Protocol16.GpType gpType1 = (Protocol16.GpType)keyTypeCode;
-        Protocol16.GpType gpType2 = (Protocol16.GpType)valTypeCode;
-        Type type1;
-        int num1;
-        switch (gpType1)
+        valueTypeCode = reader.ReadByte();
+        Type keyType = keyTypeCode switch
         {
-            case Protocol16.GpType.Unknown:
-                type1 = typeof(object);
-                goto label_7;
-            case Protocol16.GpType.Dictionary:
-                num1 = 1;
-                break;
-            default:
-                num1 = gpType1 == Protocol16.GpType.Array ? 1 : 0;
-                break;
-        }
-        if (num1 != 0)
-            throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary keys.");
-        type1 = this.GetTypeOfCode(keyTypeCode);
-    label_7:
-        Type type2;
-        int num2;
-        switch (gpType2)
+            0 => typeof(object),
+            68 or 121 => throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary keys."),
+            _ => GetTypeOfCode(keyTypeCode)
+        };
+        Type valueType = valueTypeCode switch
         {
-            case Protocol16.GpType.Unknown:
-                type2 = typeof(object);
-                goto label_14;
-            case Protocol16.GpType.Dictionary:
-                num2 = 1;
-                break;
-            default:
-                num2 = gpType2 == Protocol16.GpType.Array ? 1 : 0;
-                break;
-        }
-        if (num2 != 0)
-            throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary values.");
-        type2 = this.GetTypeOfCode(valTypeCode);
-    label_14:
-        return typeof(Dictionary<,>).MakeGenericType(type1, type2);
+            0 => typeof(object),
+            68 or 121 => throw new NotSupportedException("Client serialization protocol 1.6 does not support nesting Dictionary or Arrays into Dictionary values."),
+            _ => GetTypeOfCode(valueTypeCode)
+        };
+        return typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
     }
 
     public enum GpType : byte

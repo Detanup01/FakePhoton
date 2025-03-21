@@ -100,15 +100,15 @@ public static class StructWrapperUtility
     {
         if (!(obj is StructWrapper<T> structWrapper))
             return (T)obj;
-        T obj1 = structWrapper.value;
+        T obj1 = structWrapper.value!;
         if ((structWrapper.pooling & Pooling.ReleaseOnUnwrap) == Pooling.ReleaseOnUnwrap)
             structWrapper.Dispose();
-        return structWrapper.value;
+        return structWrapper.value!;
     }
 
     public static T Get<T>(this object obj)
     {
-        return !(obj is StructWrapper<T> structWrapper) ? (T)obj : structWrapper.value;
+        return !(obj is StructWrapper<T> structWrapper) ? (T)obj : structWrapper.value!;
     }
 
     public static T? Unwrap<T>(this Hashtable table, object key) => table[key]!.Unwrap<T>();
