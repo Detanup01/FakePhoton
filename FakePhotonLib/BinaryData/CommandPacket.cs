@@ -26,6 +26,11 @@ public class CommandPacket
     internal MessageAndCallback? messageAndCallback;
     public static byte[] ConnectPacket = [0x04, 0xB0, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x88, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02];
 
+    protected internal int SizeOfPayload => Payload?.Length ?? 0;
+
+    protected internal bool IsFlaggedUnsequenced => (CommandFlags & (int)CommandFlag.UNRELIABLE_UNSEQUENCED) > 0;
+
+    protected internal bool IsFlaggedReliable => (CommandFlags & (int)CommandFlag.RELIABLE) > 0;
     public void Read(BinaryReader reader)
     {
         commandType = (CommandType)reader.ReadByte();

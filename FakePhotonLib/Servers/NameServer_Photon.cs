@@ -49,6 +49,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
                     Console.WriteLine(ex.ToString());
                 }
             }
+            header.Commands.Add(packet);
         }
         streamBuffer.Flush();
         EnqueueHeaders.Enqueue((endpoint, header));
@@ -57,7 +58,6 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
 
     public void MessageWork()
     {
-        /*
         EndPoint? toSendDest = null;
         Header header = new()
         { 
@@ -89,17 +89,30 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
                 commandCount++;
                 if (command.IsFlaggedReliable)
                 {
-                    byte[] bytes = streamBuffer.GetBufferAndAdvance(20, out var offset);
-                    NCommand.CreateAck(bytes, offset, command, headers.Item2.ServerTime);
-                    CommandPool.Release(command);
+                    header.Commands.Add(new CommandPacket()
+                    { 
+                        commandType = command.IsFlaggedUnsequenced ? CommandType.AckUnsequenced : CommandType.Ack,
+                        AckReceivedReliableSequenceNumber = command.ReliableSequenceNumber,
+                        AckReceivedSentTime = headers.Item2.ServerTime,
+                        Size = 20,
+                        ReliableSequenceNumber = 0
+                    });
                 }
                 if (command.messageAndCallback != null)
-                    MessageManager.Parse(command.messageAndCallback);
+                {
+                    var new_callback = MessageManager.Parse(command.messageAndCallback);
+                    header.Commands.Add(new CommandPacket()
+                    {
+                        commandType = command.IsFlaggedUnsequenced ? CommandType.AckUnsequenced : CommandType.Ack,
+                        AckReceivedReliableSequenceNumber = command.ReliableSequenceNumber,
+                        AckReceivedSentTime = headers.Item2.ServerTime,
+                        Size = 20,
+                        ReliableSequenceNumber = 0
+                    });
+                }
+                    
                 // TODO: logic for send
             }
-            
-
         }
-        */
     }
 }
