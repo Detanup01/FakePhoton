@@ -17,14 +17,12 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
         base.OnStarted();
         ReceiveAsync();
     }
-    static readonly NCommandPool CommandPool = new();
     readonly Queue<(EndPoint, Header)> EnqueueHeaders = new();
 
     protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
         Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", UniqueName, Endpoint, Convert.ToHexString(buf));
-        /*
         using BinaryReader binaryReader = new(new MemoryStream(buf));
         Header header = new();
         header.Read(binaryReader);
@@ -32,19 +30,19 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
         var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
         binaryReader.Dispose();
         StreamBuffer streamBuffer = new(bytes);
-        int command_offset = 0;
         for (int i = 0; i < header.CommandCount; i++)
         {
-            Console.WriteLine($"\n-- {i} --");
-            NCommand command = CommandPool.Acquire(streamBuffer.GetBuffer(), ref command_offset);
-            header.Commands.Add(command);
-            Console.WriteLine(command.ToString());
-            if (command.Payload != null)
+            CommandPacket packet = new();
+            packet.Read(binaryReader);
+            Console.WriteLine(packet.ToString());
+
+            if (packet.Payload != null)
             {
+                packet.messageAndCallback = new(header.Challenge);
                 try
                 {
-                    command.messageAndCallback = new(header.Challenge);
-                    command.messageAndCallback.Read(command.Payload);
+                    using BinaryReader payload_reader = new(new MemoryStream(packet.Payload));
+                    packet.messageAndCallback.Read(payload_reader);
                 }
                 catch (Exception ex)
                 {
@@ -55,7 +53,6 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
         streamBuffer.Flush();
         EnqueueHeaders.Enqueue((endpoint, header));
         MessageWork();
-        */
     }
 
     public void MessageWork()
