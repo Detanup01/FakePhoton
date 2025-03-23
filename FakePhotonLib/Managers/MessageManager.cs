@@ -5,6 +5,8 @@ namespace FakePhotonLib.Managers;
 
 public static class MessageManager
 {
+    public static Dictionary<int, short> ChallengeToPeerId = [];
+
     public static MessageAndCallback Parse(MessageAndCallback messageAndCallback)
     {
         MessageAndCallback ReturnMessage = (MessageAndCallback)messageAndCallback.Clone();
@@ -17,6 +19,7 @@ public static class MessageManager
         if (messageAndCallback.operationRequest != null)
         {
             ReturnMessage.Reset();
+            ReturnMessage.MessageType = RtsMessageType.OperationResponse;
             ReturnMessage.operationResponse = OperationRequestManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationRequest);
         }
         if (messageAndCallback.IsInit != null)

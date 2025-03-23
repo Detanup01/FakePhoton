@@ -1,6 +1,4 @@
-﻿using System.Buffers.Binary;
-
-namespace FakePhotonLib.BinaryData;
+﻿namespace FakePhotonLib.BinaryData;
 
 public class Header
 {
@@ -19,10 +17,7 @@ public class Header
         PeerId = reader.ReadInt16Big();
         CrcOrEncrypted = reader.ReadByte();
         CommandCount = reader.ReadByte();
-        if (IsServer)
-            ServerTime = reader.ReadInt32();
-        else
-            ServerTime = reader.ReadInt32Big();
+        ServerTime = reader.ReadInt32Big();
         Challenge = reader.ReadInt32Big();
     }
 
@@ -37,18 +32,15 @@ public class Header
 
     public void Write(BinaryWriter writer)
     {
-        writer.Write(BinaryPrimitives.ReverseEndianness(PeerId));
+        writer.WriteInt16Big(PeerId);
         writer.Write(CrcOrEncrypted);
         writer.Write(CommandCount);
-        if (IsServer)
-            writer.Write(BinaryPrimitives.ReverseEndianness(ServerTime));
-        else
-            writer.Write(ServerTime);
-        writer.Write(BinaryPrimitives.ReverseEndianness(Challenge));
+        writer.WriteInt32Big(ServerTime);
+        writer.WriteInt32Big(Challenge);
     }
     
     public override string ToString()
     {
-        return $"Is Sent by Server: {IsServer} PeerId: {PeerId} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime} Challenge: {Challenge:x2}";
+        return $"Is Sent by Server: {IsServer} PeerId: {PeerId:x2} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime:x2} Challenge: {Challenge:x2}";
     }
 }

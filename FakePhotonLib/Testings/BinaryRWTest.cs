@@ -1,8 +1,10 @@
 ﻿using FakePhotonLib.BinaryData;
+using FakePhotonLib.Encryptions;
 using FakePhotonLib.Protocols;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -68,80 +70,30 @@ public class BinaryRWTest
 
     public static void protocol18_test()
     {
-        
-        Dictionary<byte, object> test = new();
-        test.Add(9, new byte[] { 0xFF, 0xAA, 0xBB });
-        foreach (var item in test)
+        var ServerEncryption = new DiffieHellmanCryptoProvider();
+        var ServerKey = ServerEncryption.PublicKeyAsServer;
+        OperationResponse response = new()
         {
-            Console.WriteLine(item.Key.GetType());
-            Console.WriteLine(item.Value.GetType());
-        }
-        var ser_ = Protocol.ProtocolDefault.Serialize(test);
-        Console.WriteLine(Convert.ToHexString(ser_));
-        var des = Protocol.ProtocolDefault.Deserialize(ser_);
-
-        Console.WriteLine(des);
-        Console.WriteLine(des.GetType());
-
-        Dictionary<byte, object> test_des = (Dictionary<byte, object>)des;
-
-        foreach (var item in test_des)
-        {
-            Console.WriteLine(item.Key);
-            Console.WriteLine(item.Value);
-            Console.WriteLine(item.Key.GetType());
-            Console.WriteLine(item.Value.GetType());
-
-            if (item.Value.GetType() == typeof(byte[]))
+            OperationCode = 0,
+            ReturnCode = 0,
+            Parameters = new()
             {
-                byte[] bytes = (byte[])item.Value;
-                Console.WriteLine(Convert.ToHexString(bytes));
-            }
-        }
-    }
-
-    public static void compress_test()
-    {
+                { 1, ServerKey },
+            },
+            DebugMessage = null,
+        };
         using MemoryStream ms = new();
         using BinaryWriter binaryWriter = new(ms);
-        WriteCompressedUInt64(binaryWriter, ulong.MaxValue);
-        Console.WriteLine(ulong.MaxValue);
-        WriteCompressedUInt64(binaryWriter, ulong.MaxValue);
+        Protocol.ProtocolDefault.SerializeOperationResponse(binaryWriter, response, false);
+
         byte[] data = ms.ToArray();
         ms.Dispose();
 
         using BinaryReader binaryReader = new(new MemoryStream(data));
-        Console.WriteLine(ReadCompressedUInt64(binaryReader));
-    }
 
-    private static ulong ReadCompressedUInt64(BinaryReader reader)
-    {
-        ulong result = 0;
-        int shift = 0;
+        var des = Protocol.ProtocolDefault.DeserializeOperationResponse(binaryReader);
 
-        while (shift != 70)
-        {
-            byte b = reader.ReadByte();
-            Log.Information("{val}", b);
-            result |= (ulong)(b & 0x7F) << shift;
-            shift += 7;
-            Log.Information("shift: {val}", shift);
-            if ((b & 0x80) == 0)
-                break;
-        }
-
-        return result;
-    }
-
-    private static void WriteCompressedUInt64(BinaryWriter writer, ulong value)
-    {
-        while (value > 0x7F)
-        {
-            writer.Write((byte)((value & 0x7F) | 0x80));
-            Log.Information("b4 : {val}", value);
-            value >>= 7;
-            Log.Information("{val}", value);
-        }
-        writer.Write((byte)value);
+        Console.WriteLine(des);
+        Console.WriteLine(des.GetType());
     }
 }

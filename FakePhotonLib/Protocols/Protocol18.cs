@@ -851,7 +851,8 @@ public class Protocol18 : IProtocol
 
     public override void SerializeOperationResponse(BinaryWriter stream, OperationResponse serObject, bool setType)
     {
-        if (setType) stream.Write((byte)25);
+        if (setType) 
+            stream.Write((byte)25);
         stream.Write(serObject.OperationCode);
         WriteInt16(stream, serObject.ReturnCode, false);
         if (string.IsNullOrEmpty(serObject.DebugMessage))

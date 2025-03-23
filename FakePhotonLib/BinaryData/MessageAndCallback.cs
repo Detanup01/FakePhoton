@@ -51,14 +51,10 @@ public class MessageAndCallback : ICloneable
         }
 
         byte b2 =  reader.ReadByte();
-        Console.WriteLine($"b2: {b2}");
         byte b3 = (byte)(b2 & 127);
-        Console.WriteLine($"b3: {b3}");
         MessageType = (RtsMessageType)b3;
         IsEncrypted = (b2 & 128) > 0;
         bool flag7 = b3 != 1;
-        Console.WriteLine("IsEncrypted: " + IsEncrypted);
-        Console.WriteLine("Flag7: "+ flag7);
         if (IsEncrypted)
         {
             if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
@@ -96,22 +92,24 @@ public class MessageAndCallback : ICloneable
 
     public void Write(BinaryWriter writer)
     {
-        writer.Write(253);
+        writer.Write((byte)243);
         var msg_type = (byte)MessageType;
         if (IsEncrypted)
             msg_type |= 128;
         writer.Write(msg_type);
+        //writer.Write((byte)0);
         byte[] data = [];
         if (operationResponse != null)
-            Protocol.ProtocolDefault.Serialize(operationResponse!);
+            Protocol.ProtocolDefault.SerializeOperationResponse(writer, operationResponse, false);
         if (operationRequest != null)
-            Protocol.ProtocolDefault.Serialize(operationRequest!);
+            Protocol.ProtocolDefault.SerializeOperationRequest(writer, operationRequest.OperationCode, operationRequest.Parameters, false);
         if (eventData != null)
-            Protocol.ProtocolDefault.Serialize(eventData!);
+            Protocol.ProtocolDefault.SerializeEventData(writer, eventData, false);
         if (disconnectMessage != null)
-            Protocol.ProtocolDefault.Serialize(disconnectMessage!);
+            Protocol.ProtocolDefault.SerializeMessage(writer, disconnectMessage);
         if (IsEncrypted)
         {
+            Log.Error("TODO!!!");
             if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
             {
                 Log.Error("This should not throw!");
@@ -119,7 +117,6 @@ public class MessageAndCallback : ICloneable
             }
             data = cryptoProvider.Encrypt(data);
         }
-        writer.Write(data, 0, data.Length);
     }
 
     public void Reset()
@@ -137,7 +134,7 @@ public class MessageAndCallback : ICloneable
     {
         string? oprespone = operationResponse == null ? string.Empty : operationResponse.ToString();
         string? op_request = operationRequest == null ? string.Empty : operationRequest.ToString();
-        return $"IsNotValid: {IsNotValid} {MessageType} {IsInit} {oprespone} {op_request}";
+        return $"IsNotValid: {IsNotValid} {MessageType} {IsInit.HasValue} {oprespone} {op_request}";
     }
 
     public object Clone()

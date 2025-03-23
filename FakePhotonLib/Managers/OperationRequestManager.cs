@@ -17,14 +17,18 @@ public static class OperationRequestManager
 
     internal static OperationResponse InitEncryption(int challenge, OperationRequest operationResponse)
     {
+
+        Console.WriteLine($"{operationResponse.Parameters[1]!.GetType()}");
+
         var data = (byte[])operationResponse.Parameters[1]!;
         if (data == null || data.Length == 0)
         {
             Log.Error("Establishing encryption keys failed. Server's public key is null or empty");
             return new() { OperationCode = 0, ReturnCode = -1, DebugMessage = "Encryption key is not present or invalid" };
         }
+       
         var responseKey = EncryptionManager.ExchangeKeys(challenge, data);
-
+        Log.Information("Exchaned keys!");
         OperationResponse response = new()
         { 
             OperationCode = operationResponse.OperationCode, 
@@ -32,7 +36,8 @@ public static class OperationRequestManager
             Parameters = new()
             {
                 { 1, responseKey },
-            }
+            },
+            DebugMessage = null,
         };
         if (responseKey == null)
         {

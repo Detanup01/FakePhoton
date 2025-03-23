@@ -51,8 +51,9 @@ public static class Analyze
                 MessageAndCallback messageAndCallback = new(header.Challenge);
                 try
                 {
-                    //messageAndCallback.Read(packet.Payload);
-                    //MessageManager.Parse(messageAndCallback);
+                    BinaryReader payload_reader = new BinaryReader(new MemoryStream(packet.Payload));
+                    messageAndCallback.Read(payload_reader);
+                    Console.WriteLine(messageAndCallback.ToString());
                 }
                 catch (Exception ex)
                 {

@@ -80,48 +80,56 @@ public class CommandPacket
         }
         if (ShouldSetPayload != 0)
         {
-            Console.WriteLine("ShouldSetPayload: " + ShouldSetPayload);
             Payload = reader.ReadBytes(ShouldSetPayload);
-            Console.WriteLine("PayLoad: " + Payload.Length);
+            if (commandType == CommandType.Connect)
+                Payload = null;
         }
     }
 
     public void Write(BinaryWriter writer)
     {
+        short peerid = (short)RandomNumberGenerator.GetInt32(short.MaxValue);
         writer.Write((byte)commandType);
         writer.Write(ChannelID);
         writer.Write(CommandFlags);
         writer.Write(ReservedByte);
-        writer.Write(BinaryPrimitives.ReverseEndianness(Size));
-        writer.Write(BinaryPrimitives.ReverseEndianness(ReliableSequenceNumber));
+        writer.WriteInt32Big(Size);
+        writer.WriteInt32Big(ReliableSequenceNumber);
         switch (commandType)
         {
             case CommandType.SendUnreliable:
-                writer.Write(BinaryPrimitives.ReverseEndianness(UnreliableSequenceNumber));
+                writer.WriteInt32Big(UnreliableSequenceNumber);
                 break;
             case CommandType.SendUnsequenced:
-                writer.Write(BinaryPrimitives.ReverseEndianness(UnsequencedGroupNumber));
+                writer.WriteInt32Big(UnsequencedGroupNumber);
                 break;
             case CommandType.SendFragment:
             case CommandType.SendFragmentUnsequenced:
-                writer.Write(BinaryPrimitives.ReverseEndianness(StartSequenceNumber));
-                writer.Write(BinaryPrimitives.ReverseEndianness(FragmentCount));
-                writer.Write(BinaryPrimitives.ReverseEndianness(FragmentNumber));
-                writer.Write(BinaryPrimitives.ReverseEndianness(TotalLength));
-                writer.Write(BinaryPrimitives.ReverseEndianness(FragmentOffset));
+                writer.WriteInt32Big(StartSequenceNumber);
+                writer.WriteInt32Big(FragmentCount);
+                writer.WriteInt32Big(FragmentNumber);
+                writer.WriteInt32Big(TotalLength);
+                writer.WriteInt32Big(FragmentOffset);
                 break;
             case CommandType.Ack:
             case CommandType.AckUnsequenced:
-                writer.Write(BinaryPrimitives.ReverseEndianness(AckReceivedReliableSequenceNumber));
-                writer.Write(BinaryPrimitives.ReverseEndianness(AckReceivedSentTime));
+                writer.WriteInt32Big(AckReceivedReliableSequenceNumber);
+                writer.WriteInt32Big(AckReceivedSentTime);
                 break;
             case CommandType.Connect:
-                short peerid = (short)RandomNumberGenerator.GetInt32(short.MaxValue);
                 if (peerID.HasValue)
                 {
                     peerid = peerID.Value;
                 }
-                writer.Write(BinaryPrimitives.ReverseEndianness(peerid));
+                writer.WriteInt16Big(peerid);
+                writer.Write(ConnectPacket);
+                break;
+            case CommandType.VerifyConnect:
+                if (peerID.HasValue)
+                {
+                    peerid = peerID.Value;
+                }
+                writer.WriteInt16Big(peerid);
                 writer.Write(ConnectPacket);
                 break;
             default:
@@ -136,7 +144,12 @@ public class CommandPacket
     public override string ToString()
     {
         string payload_size = Payload == null ? string.Empty : Payload.Count().ToString();
-        return $"Type: {commandType} Id: {ChannelID} Flag: {CommandFlags} Reserved: {ReservedByte} Size: {Size} RSN: {ReliableSequenceNumber} {payload_size}";
+        string ack_str = string.Empty;
+        if (commandType == CommandType.Ack)
+        {
+            ack_str = $"ARSN: {AckReceivedReliableSequenceNumber} ARST: {AckReceivedSentTime:x2}";
+        }
+        return $"Type: {commandType} Id: {ChannelID} Flag: {CommandFlags} Reserved: {ReservedByte} Size: {Size} RSN: {ReliableSequenceNumber} {ack_str} {payload_size}";
     }
 }
 
