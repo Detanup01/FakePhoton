@@ -5,22 +5,27 @@ namespace FakePhotonLib.Managers;
 
 public static class OperationRequestManager
 {
-    public static OperationResponse? Parse(int challenge, OperationRequest operationResponse)
+    public static OperationResponse? Parse(int challenge, OperationRequest opReq)
     {
-        if (operationResponse.OperationCode == 0) // InitEncryption
+        if (opReq.OperationCode == (byte)OperationCodeEnum.ExchangeKeys)
         {
-            return InitEncryption(challenge, operationResponse);
+            return InitEncryption(challenge, opReq);
         }
-        Console.WriteLine("Request not found: " + operationResponse.OperationCode);
+        if (opReq.OperationCode == (byte)OperationCodeEnum.GetRegionList)
+        {
+            return GetRegionList(challenge, opReq);
+        }
+
+        Console.WriteLine("Request not found: " + opReq.OperationCode);
         return null;
     }
 
-    internal static OperationResponse InitEncryption(int challenge, OperationRequest operationResponse)
+    internal static OperationResponse InitEncryption(int challenge, OperationRequest opReq)
     {
 
-        Console.WriteLine($"{operationResponse.Parameters[1]!.GetType()}");
+        Console.WriteLine($"{opReq.Parameters[1]!.GetType()}");
 
-        var data = (byte[])operationResponse.Parameters[1]!;
+        var data = (byte[])opReq.Parameters[1]!;
         if (data == null || data.Length == 0)
         {
             Log.Error("Establishing encryption keys failed. Server's public key is null or empty");
@@ -31,7 +36,7 @@ public static class OperationRequestManager
         Log.Information("Exchaned keys!");
         OperationResponse response = new()
         { 
-            OperationCode = operationResponse.OperationCode, 
+            OperationCode = opReq.OperationCode, 
             ReturnCode = 0, 
             Parameters = new()
             {
@@ -44,5 +49,22 @@ public static class OperationRequestManager
             response.ReturnCode = -1;
         }
         return response;
+    }
+
+    internal static OperationResponse GetRegionList(int challenge, OperationRequest opReq)
+    {
+        string[] region = ["eu"];
+        string[] endpoints = ["127.0.0.1:5505"]; // todo make a config var
+        return new()
+        {
+            OperationCode = opReq.OperationCode,
+            ReturnCode = 0,
+            Parameters = new()
+            {
+                { (byte)ParameterCodesEnum.Region_GetRegionListResponse, region },
+                { (byte)ParameterCodesEnum.Endpoints_GetRegionListResponse, endpoints },
+            },
+            DebugMessage = null,
+        };
     }
 }

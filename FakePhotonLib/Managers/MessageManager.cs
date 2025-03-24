@@ -19,7 +19,7 @@ public static class MessageManager
         if (messageAndCallback.operationRequest != null)
         {
             ReturnMessage.Reset();
-            ReturnMessage.MessageType = RtsMessageType.OperationResponse;
+            ReturnMessage.MessageType = RtsMessageType.InternalOperationResponse;
             ReturnMessage.operationResponse = OperationRequestManager.Parse(messageAndCallback.Challenge, messageAndCallback.operationRequest);
         }
         if (messageAndCallback.IsInit != null)

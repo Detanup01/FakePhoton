@@ -72,10 +72,12 @@ public class MessageAndCallback : ICloneable
                 break;
             case RtsMessageType.InitResponse:
                 break;
+            case RtsMessageType.Operation:
             case RtsMessageType.InternalOperationRequest:
                 operationRequest = Protocol.ProtocolDefault.DeserializeOperationRequest(reader);
                 break;
             case RtsMessageType.OperationResponse:
+            case RtsMessageType.InternalOperationResponse:
                 operationResponse = Protocol.ProtocolDefault.DeserializeOperationResponse(reader);
                 break;
             case RtsMessageType.Event:
@@ -97,16 +99,18 @@ public class MessageAndCallback : ICloneable
         if (IsEncrypted)
             msg_type |= 128;
         writer.Write(msg_type);
-        //writer.Write((byte)0);
-        byte[] data = [];
+
+        using MemoryStream ms = new();
+        using BinaryWriter dataWriter = new(ms);
+
         if (operationResponse != null)
-            Protocol.ProtocolDefault.SerializeOperationResponse(writer, operationResponse, false);
+            Protocol.ProtocolDefault.SerializeOperationResponse(dataWriter, operationResponse, false);
         if (operationRequest != null)
-            Protocol.ProtocolDefault.SerializeOperationRequest(writer, operationRequest.OperationCode, operationRequest.Parameters, false);
+            Protocol.ProtocolDefault.SerializeOperationRequest(dataWriter, operationRequest.OperationCode, operationRequest.Parameters, false);
         if (eventData != null)
-            Protocol.ProtocolDefault.SerializeEventData(writer, eventData, false);
+            Protocol.ProtocolDefault.SerializeEventData(dataWriter, eventData, false);
         if (disconnectMessage != null)
-            Protocol.ProtocolDefault.SerializeMessage(writer, disconnectMessage);
+            Protocol.ProtocolDefault.SerializeMessage(dataWriter, disconnectMessage);
         if (IsEncrypted)
         {
             Log.Error("TODO!!!");
@@ -115,8 +119,10 @@ public class MessageAndCallback : ICloneable
                 Log.Error("This should not throw!");
                 return;
             }
-            data = cryptoProvider.Encrypt(data);
+            writer.Write(cryptoProvider.Encrypt(ms.ToArray()));
         }
+        else
+            writer.Write(ms.ToArray());
     }
 
     public void Reset()

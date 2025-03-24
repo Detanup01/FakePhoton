@@ -1,12 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using FakePhotonLib.BinaryData;
 using FakePhotonLib.Managers;
-using FakePhotonLib.PacketAnalyzer;
-using FakePhotonLib.PhotonRelated;
 using NetCoreServer;
 using Serilog;
 
@@ -39,13 +36,13 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
         using BinaryReader binaryReader = new(new MemoryStream(buf));
         Header header = new();
         header.Read(binaryReader);
-        //Console.WriteLine(header.ToString());
+        Console.WriteLine(header.ToString());
         //var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
         for (int i = 0; i < header.CommandCount; i++)
         {
             CommandPacket packet = new();
             packet.Read(binaryReader);
-            //Console.WriteLine(packet.ToString());
+            Console.WriteLine(packet.ToString());
 
             if (packet.Payload != null)
             {
@@ -75,7 +72,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
             CrcOrEncrypted = 0,
             PeerId = 0,
             Commands = [],
-            ServerTime = (int)Stopwatch.ElapsedMilliseconds,
+            ServerTime = Environment.TickCount,
             Challenge = header_from.Challenge,
         };
 
@@ -104,7 +101,6 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
                 {
                     commandType = CommandType.SendReliable,
                     ReliableSequenceNumber = command.ReliableSequenceNumber,
-                    AckReceivedSentTime = header_from.ServerTime,
                     Size = 12,
                     ChannelID = command.ChannelID,
                     CommandFlags = 1,
