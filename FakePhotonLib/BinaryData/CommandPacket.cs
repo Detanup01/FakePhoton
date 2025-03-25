@@ -1,5 +1,4 @@
 ﻿using Serilog;
-using System.Buffers.Binary;
 using System.Security.Cryptography;
 
 namespace FakePhotonLib.BinaryData;
@@ -25,11 +24,7 @@ public class CommandPacket
     internal short? peerID;
     internal MessageAndCallback? messageAndCallback;
     public static byte[] ConnectPacket = [0x04, 0xB0, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x88, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02];
-
-    protected internal int SizeOfPayload => Payload?.Length ?? 0;
-
     protected internal bool IsFlaggedUnsequenced => (CommandFlags & (int)CommandFlag.UNRELIABLE_UNSEQUENCED) > 0;
-
     protected internal bool IsFlaggedReliable => (CommandFlags & (int)CommandFlag.RELIABLE) > 0;
     public void Read(BinaryReader reader)
     {
@@ -49,9 +44,7 @@ public class CommandPacket
                 break;
             case CommandType.VerifyConnect:
                 peerID = reader.ReadInt16Big();
-                var x = (int)(reader.BaseStream.Length - reader.BaseStream.Position);
-                var y = reader.ReadBytes(x);
-                Log.Information("{HexString} {len}", Convert.ToHexString(y), y.Length);
+                var connectPacket = reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position));
                 break;
             case CommandType.SendReliable:
             case CommandType.SendReliableUnsequenced:

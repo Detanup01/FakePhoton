@@ -1,48 +1,29 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
-using System.Security.Cryptography;
-using FakePhotonLib.BinaryData;
-using FakePhotonLib.Managers;
+﻿using FakePhotonLib.BinaryData;
 using NetCoreServer;
 using Serilog;
+using System.Net;
+using System.Security.Cryptography;
 
-namespace FakePhotonLib.Servers;
+namespace FakePhotonLib.Managers;
 
-public class NameServer_Photon(string uniqueName, IPAddress address, int port) : UdpServer(address, port)
+public class PacketManager
 {
-    public Stopwatch Stopwatch = new Stopwatch();
+    public static Dictionary<short, EndPoint> PeerToEndPoint = [];
 
-    public string UniqueName = uniqueName;
-
-    protected override void OnStarted()
+    public static void IncommingProcess(EndPoint endpoint, UdpServer server, byte[] data)
     {
-        Stopwatch.Start();
-        base.OnStarted();
-        ReceiveAsync();
-    }
-    protected override void OnStopped()
-    {
-        base.OnStopped();
-        Stopwatch.Stop();
-    }
-
-    readonly List<(EndPoint, Header)> PacketsThatExists = new();
-
-    protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
-    {
-        var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
-        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", UniqueName, endpoint, Convert.ToHexString(buf));
-        using BinaryReader binaryReader = new(new MemoryStream(buf));
-        Header header = new();
+        using BinaryReader binaryReader = new(new MemoryStream(data));
+        Header header = new()
+        { 
+            EndPoint = endpoint,
+        };
         header.Read(binaryReader);
-        Console.WriteLine(header.ToString());
-        //var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
+        Log.Information("{UniqueName} Received: {Header}", server.GetType().Name, header.ToString());
         for (int i = 0; i < header.CommandCount; i++)
         {
             CommandPacket packet = new();
             packet.Read(binaryReader);
-            Console.WriteLine(packet.ToString());
+            Log.Information("{UniqueName} Received: {Packet}", server.GetType().Name, packet.ToString());
 
             if (packet.Payload != null)
             {
@@ -51,7 +32,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
                 {
                     using BinaryReader payload_reader = new(new MemoryStream(packet.Payload));
                     packet.messageAndCallback.Read(payload_reader);
-                    Console.WriteLine(packet.messageAndCallback.ToString());
+                    Log.Information("{UniqueName} Received: {MC}", server.GetType().Name, packet.messageAndCallback.ToString());
                 }
                 catch (Exception ex)
                 {
@@ -60,15 +41,14 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
             }
             header.Commands.Add(packet);
         }
-        //streamBuffer.Flush();
-        MessageWork(endpoint, header);
-        ReceiveAsync();
+        ProcessAndSend(endpoint, header, server);
     }
 
-    public void MessageWork(EndPoint endpoint, Header header_from)
+    public static void ProcessAndSend(EndPoint endpoint, Header header_from, UdpServer server)
     {
         Header header = new()
-        { 
+        {
+            EndPoint = endpoint,
             CrcOrEncrypted = 0,
             PeerId = 0,
             Commands = [],
@@ -113,6 +93,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
                 Log.Information("Replying with VerifyConnect!");
                 var peerID = (short)RandomNumberGenerator.GetInt32(short.MaxValue);
                 MessageManager.ChallengeToPeerId.Add(header.Challenge, peerID);
+                PeerToEndPoint.Add(peerID, endpoint);
                 header.Commands.Add(new CommandPacket()
                 {
                     peerID = peerID,
@@ -140,7 +121,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
 
         using MemoryStream ms = new();
         using BinaryWriter writer = new(ms);
-       
+
         foreach (var commandPacket in header.Commands)
         {
             if (commandPacket.messageAndCallback != null)
@@ -160,15 +141,7 @@ public class NameServer_Photon(string uniqueName, IPAddress address, int port) :
 
         Log.Information("Sending out packet {packet} {packetLen} to {address}", Convert.ToHexString(packet), packet.Length, endpoint);
 
-        //Analyze.SinglePacket(Convert.ToHexString(packet));
-
-        var sentBytes = Send(endpoint, packet);
+        var sentBytes = server.Send(endpoint, packet);
         Log.Information("Sent bytes: {sent}", sentBytes);
-    }
-
-    protected override void OnError(SocketError error)
-    {
-        Log.Error("ERROR! {sockError}" , error);
-        base.OnError(error);
     }
 }

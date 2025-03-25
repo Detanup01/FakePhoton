@@ -1,17 +1,19 @@
 ﻿using FakePhotonLib.Servers;
+using NetCoreServer;
 
 namespace FakePhotonLib.Managers;
 
 public static class ServerManager
 {
-    static List<NameServer_Photon> UDPServers = [];
+    static List<UdpServer> UDPServers = [];
 
     public static void Start()
     {
-        UDPServers.Add(new("NameServer", System.Net.IPAddress.Any, 5058));
-        UDPServers.Add(new("EU_MasterServer", System.Net.IPAddress.Any, 5055));
+        UDPServers.Add(new NameServer(System.Net.IPAddress.Loopback, 5058));
+        UDPServers.Add(new MasterGameServer(System.Net.IPAddress.Loopback, 5055));
+        UDPServers.Add(new GameServer(System.Net.IPAddress.Loopback, 5000));
 
-        foreach (NameServer_Photon server in UDPServers)
+        foreach (var server in UDPServers)
         {
             server.Start();
         }
@@ -19,7 +21,7 @@ public static class ServerManager
 
     public static void Stop()
     {
-        foreach (NameServer_Photon server in UDPServers)
+        foreach (var server in UDPServers)
         {
             server.Stop();
         }

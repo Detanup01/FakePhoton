@@ -11,6 +11,6 @@ public class OperationResponse
 
     public override string ToString()
     {
-        return $"(OperationResponse) Code: {OperationCode} ReturnCode: {ReturnCode} DebugMessage: {DebugMessage} DataCount : {Parameters.Count}";
+        return $"(OperationResponse) Code: {OperationCode} ({(OperationCodeEnum)OperationCode}) ReturnCode: {ReturnCode} DebugMessage: {DebugMessage} DataCount : {Parameters.Count} {string.Join(", ", Parameters.Keys)}";
     }
 }

@@ -7,6 +7,7 @@ public class OperationRequest
 
     public override string ToString()
     {
-        return $"(OperationRequest) OperationCode: {OperationCode} Count: {Parameters.Count}";
+
+        return $"(OperationRequest) OperationCode: {OperationCode} ({(OperationCodeEnum)OperationCode}) Count: {Parameters.Count} {string.Join(", ", Parameters.Keys)}";
     }
 }

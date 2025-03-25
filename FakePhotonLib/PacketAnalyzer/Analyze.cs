@@ -1,12 +1,11 @@
 ﻿using FakePhotonLib.BinaryData;
-using FakePhotonLib.Managers;
-using FakePhotonLib.PhotonRelated;
+using FakePhotonLib.Protocols;
+using Serilog;
 
 namespace FakePhotonLib.PacketAnalyzer;
 
 public static class Analyze
 {
-
     public static void Init()
     {
         if (Directory.Exists("Anal"))
@@ -28,17 +27,26 @@ public static class Analyze
                 i++;
             }
         }
+
+        if (File.Exists("packets.txt"))
+        {
+            int i = 0;
+            foreach (string line in File.ReadAllLines("packets.txt"))
+            {
+                Console.WriteLine("Packet Number: " + i);
+                ReadMessageAndCallback(line.ReplaceLineEndings());
+                i++;
+            }
+        }
     }
-    static NCommandPool CommandPool = new();
+
     public static void SinglePacket(string packetAsHex)
     {
-        MemoryStream ms = new MemoryStream(Convert.FromHexString(packetAsHex));
-        BinaryReader binaryReader = new BinaryReader(ms);
+        using MemoryStream ms = new MemoryStream(Convert.FromHexString(packetAsHex));
+        using BinaryReader binaryReader = new BinaryReader(ms);
         Header header = new();
         header.Read(binaryReader);
         Console.WriteLine(header.ToString());
-        //var bytes = binaryReader.ReadBytes((int)(binaryReader.BaseStream.Length - binaryReader.BaseStream.Position));
-        //StreamBuffer streamBuffer = new StreamBuffer(bytes);
         for (int i = 0; i < header.CommandCount; i++)
         {
             Console.WriteLine($"\n-- {i} --");
@@ -51,7 +59,7 @@ public static class Analyze
                 MessageAndCallback messageAndCallback = new(header.Challenge);
                 try
                 {
-                    BinaryReader payload_reader = new BinaryReader(new MemoryStream(packet.Payload));
+                    using BinaryReader payload_reader = new BinaryReader(new MemoryStream(packet.Payload));
                     messageAndCallback.Read(payload_reader);
                     Console.WriteLine(messageAndCallback.ToString());
                 }
@@ -63,9 +71,52 @@ public static class Analyze
         }
     }
 
-    static void ReadPacket()
-    {
 
+    static void ReadMessageAndCallback(string bytes)
+    {
+        using BinaryReader payload_reader = new BinaryReader(new MemoryStream(Convert.FromHexString(bytes)));
+        try
+        {
+            var req = Protocol.ProtocolDefault.DeserializeOperationRequest(payload_reader);
+            foreach (var item in req.Parameters)
+            {
+                Log.Information("Req! Key: {Key} Value: {Value}", item.Key, item.Value);
+            }
+        }
+        catch (Exception)
+        {
+
+            
+        }
+        payload_reader.BaseStream.Position = 0;
+        try
+        {
+            var rsp = Protocol.ProtocolDefault.DeserializeOperationResponse(payload_reader);
+            foreach (var item in rsp.Parameters)
+            {
+                Log.Information("Rsp! Key: {Key} Value: {Value}", item.Key, item.Value);
+            }
+        }
+        catch (Exception)
+        {
+
+            
+        }
+        payload_reader.BaseStream.Position = 0;
+        try
+        {
+            var ev = Protocol.ProtocolDefault.DeserializeEventData(payload_reader);
+            foreach (var item in ev.Parameters)
+            {
+                Log.Information("Event! Key: {Key} Value: {Value}", item.Key, item.Value);
+            }
+        }
+        catch (Exception)
+        {
+
+            
+        }
+        payload_reader.BaseStream.Position = 0;
     }
 
 }

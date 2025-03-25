@@ -113,7 +113,6 @@ public class MessageAndCallback : ICloneable
             Protocol.ProtocolDefault.SerializeMessage(dataWriter, disconnectMessage);
         if (IsEncrypted)
         {
-            Log.Error("TODO!!!");
             if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
             {
                 Log.Error("This should not throw!");

@@ -1,7 +1,10 @@
-﻿namespace FakePhotonLib.BinaryData;
+﻿using System.Net;
+
+namespace FakePhotonLib.BinaryData;
 
 public class Header
 {
+    internal EndPoint? EndPoint;
     public bool IsServer => PeerId == 0;
     public short PeerId = -1;
     public byte CrcOrEncrypted;

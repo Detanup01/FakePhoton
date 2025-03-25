@@ -1,5 +1,4 @@
-﻿using FakePhotonLib.BinaryData;
-using FakePhotonLib.Protocols;
+﻿using FakePhotonLib.Protocols;
 using Serilog;
 
 namespace FakePhotonLib.PhotonRelated;
@@ -30,7 +29,6 @@ public class NCommand : IComparable<NCommand>
     internal StreamBuffer? Payload;
     internal NCommandPool? returnPool;
     internal int peerID;
-    internal MessageAndCallback? messageAndCallback;
 
     public enum CommandFlag
     {

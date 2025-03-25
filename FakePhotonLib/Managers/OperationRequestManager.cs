@@ -15,6 +15,10 @@ public static class OperationRequestManager
         {
             return GetRegionList(challenge, opReq);
         }
+        if (opReq.OperationCode == (byte)OperationCodeEnum.Authenticate)
+        {
+            return Authenticate(challenge, opReq);
+        }
 
         Console.WriteLine("Request not found: " + opReq.OperationCode);
         return null;
@@ -22,9 +26,6 @@ public static class OperationRequestManager
 
     internal static OperationResponse InitEncryption(int challenge, OperationRequest opReq)
     {
-
-        Console.WriteLine($"{opReq.Parameters[1]!.GetType()}");
-
         var data = (byte[])opReq.Parameters[1]!;
         if (data == null || data.Length == 0)
         {
@@ -33,7 +34,6 @@ public static class OperationRequestManager
         }
        
         var responseKey = EncryptionManager.ExchangeKeys(challenge, data);
-        Log.Information("Exchaned keys!");
         OperationResponse response = new()
         { 
             OperationCode = opReq.OperationCode, 
@@ -63,6 +63,46 @@ public static class OperationRequestManager
             {
                 { (byte)ParameterCodesEnum.Region_GetRegionListResponse, region },
                 { (byte)ParameterCodesEnum.Endpoints_GetRegionListResponse, endpoints },
+            },
+            DebugMessage = null,
+        };
+    }
+
+    internal static OperationResponse Authenticate(int challenge, OperationRequest opReq)
+    {
+        if (opReq.Parameters.ContainsKey((byte)ParameterCodesEnum.ApplicationVersion_AuthenticateRequest))
+        {
+            var Version = opReq.Parameters[(byte)ParameterCodesEnum.ApplicationVersion_AuthenticateRequest];
+            var AppId = opReq.Parameters[(byte)ParameterCodesEnum.ApplicationId_AuthenticateRequest];
+            var Region = opReq.Parameters[(byte)ParameterCodesEnum.Region_AuthenticateRequest];
+            var UserId = opReq.Parameters[(byte)ParameterCodesEnum.UserId_AuthenticateRequest];
+            var AuthType = opReq.Parameters[(byte)ParameterCodesEnum.ClientAuthenticationType_AuthenticateRequest];
+            var AuthParams = opReq.Parameters[(byte)ParameterCodesEnum.ClientAuthenticationParams_AuthenticateRequest];
+            Log.Information("Authenticate! Version {Version} AppId {AppId} Region {Region}, UserId {UserId} AuthType {AuthType} Params {AuthParams}", Version, AppId, Region, UserId, AuthType, AuthParams);
+
+            return new()
+            {
+                OperationCode = opReq.OperationCode,
+                ReturnCode = 0,
+                Parameters = new()
+            {
+                { (byte)ParameterCodesEnum.MasterEndpoint_AuthenticateResponse, "127.0.0.1:5055" },
+                { (byte)ParameterCodesEnum.AuthenticationToken_AuthenticateResponse, $"{AppId}_{UserId}" },
+                { (byte)ParameterCodesEnum.UserId_AuthenticateResponse, UserId },
+            },
+                DebugMessage = null,
+            };
+        }
+        var token = opReq.Parameters[(byte)ParameterCodesEnum.Token_AuthenticateRequest];
+        return new()
+        {
+            OperationCode = opReq.OperationCode,
+            ReturnCode = 0,
+            Parameters = new()
+            {
+                { (byte)ParameterCodesEnum.MasterEndpoint_AuthenticateResponse, "127.0.0.1:5055" },
+                { (byte)ParameterCodesEnum.AuthenticationToken_AuthenticateResponse, token },
+                { (byte)ParameterCodesEnum.UserId_AuthenticateResponse, ((string)token!).Split("_")[1] },
             },
             DebugMessage = null,
         };
