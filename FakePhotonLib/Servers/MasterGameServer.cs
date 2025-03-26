@@ -23,7 +23,8 @@ public class MasterGameServer(IPAddress address, int port) : UdpServer(address, 
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
         Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", nameof(MasterGameServer), endpoint, Convert.ToHexString(buf));
-
+        if (buf.Length == 0)
+            return;
         if (buf.Length >= 12 && Convert.ToHexString(buf[..12]) == "7D7D7D7D7D7D7D7D7D7D7D7D")
         {
             Send(endpoint, buf);

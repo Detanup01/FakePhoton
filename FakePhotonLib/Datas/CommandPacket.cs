@@ -142,7 +142,7 @@ public class CommandPacket
         {
             ack_str = $"ARSN: {AckReceivedReliableSequenceNumber} ARST: {AckReceivedSentTime:x2}";
         }
-        return $"Type: {commandType} Id: {ChannelID} Flag: {CommandFlags} Reserved: {ReservedByte} Size: {Size} RSN: {ReliableSequenceNumber} {ack_str} {payload_size}";
+        return $"Type: {commandType} ChannelId: {ChannelID} Flag: {CommandFlags} Reserved: {ReservedByte} Size: {Size} RSN: {ReliableSequenceNumber} {ack_str} {payload_size}";
     }
 }
 

@@ -50,7 +50,6 @@ public enum ParameterCodesEnum
     CustomAuthUserIdUsed_AuthenticationToken = 118,
     QueuePosition_AuthenticateResponse = 223,
     CurrentCluster_AuthenticateResponse = 196,
-    ActorProperties_JoinGameRequest = 249,
     BroadcastActorProperties_JoinGameRequest = 250,
     GameId_JoinGameRequest = 255,
     GameProperties_JoinGameRequest = 248,
@@ -74,6 +73,6 @@ public enum ParameterCodesEnum
     Address_JoinGameResponse = 230,
     RoomFlags_JoinGameResponse = 191,
     GameProperties_JoinGameResponse = 248,
-    ActorsProperties_JoinGameResponse = 249,
+    ActorProperties_Common = 249,
     Actors_Common = 252,
 }

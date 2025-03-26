@@ -11,7 +11,7 @@ public enum OperationCodeEnum : byte
     FindFriends = 222,
     DebugGame = 223,
     JoinRandomGame = 225,
-    JoinedGame = 226,
+    JoinGame = 226,
     CreateGame = 227,
     LeaveLobby = 228,
     JoinLobby = 229,

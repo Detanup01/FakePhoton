@@ -1,5 +1,6 @@
 ﻿using FakePhotonLib.BinaryData;
 using Serilog;
+using System.Net;
 
 namespace FakePhotonLib.Managers;
 

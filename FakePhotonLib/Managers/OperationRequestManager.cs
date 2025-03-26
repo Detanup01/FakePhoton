@@ -1,11 +1,12 @@
 ﻿using FakePhotonLib.BinaryData;
 using Serilog;
+using System.Net;
 
 namespace FakePhotonLib.Managers;
 
 public static class OperationRequestManager
 {
-    public static OperationResponse? Parse(int challenge, OperationRequest opReq)
+    public static OperationResponse? Parse(int challenge, OperationRequest opReq, EndPoint endPoint)
     {
         if (opReq.OperationCode == (byte)OperationCodeEnum.ExchangeKeys)
         {
@@ -18,6 +19,10 @@ public static class OperationRequestManager
         if (opReq.OperationCode == (byte)OperationCodeEnum.Authenticate)
         {
             return Authenticate(challenge, opReq);
+        }
+        if (opReq.OperationCode == (byte)OperationCodeEnum.JoinGame)
+        {
+            return JoinGame(challenge, opReq);
         }
 
         Console.WriteLine("Request not found: " + opReq.OperationCode);
@@ -105,6 +110,109 @@ public static class OperationRequestManager
                 { (byte)ParameterCodesEnum.UserId_AuthenticateResponse, ((string)token!).Split("_")[1] },
             },
             DebugMessage = null,
+        };
+    }
+
+    internal static OperationResponse JoinGame(int challenge, OperationRequest opReq)
+    {
+        object? obj = null;
+
+        string GameId = (string)opReq.Parameters[(byte)ParameterCodesEnum.GameId_JoinGameRequest]!;
+        byte JoinMode = (byte)opReq.Parameters[(byte)ParameterCodesEnum.InternalJoinMode_JoinGameRequest]!;
+        if (JoinMode == 1 && !GameManager.IsGameExist(GameId))
+            GameManager.Create(GameId);
+        else
+        {
+            GameManager.ChangeGame(GameId, opReq.Parameters);
+        }
+        #region x
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.ActorNr_JoinGameRequest,out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.ActorNr_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.ActorProperties_Common, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.ActorProperties_Common, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.AddUsers_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.AddUsers_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.BroadcastActorProperties_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.BroadcastActorProperties_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.CacheSlice_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.CacheSlice_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.CheckUserOnJoin_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.CheckUserOnJoin_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.DeleteCacheOnLeave_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.DeleteCacheOnLeave_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.EmptyRoomLiveTime_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.EmptyRoomLiveTime_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.ForceRejoin_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.ForceRejoin_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.GameId_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.GameId_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.GameProperties_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.GameProperties_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.InternalJoinMode_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.InternalJoinMode_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.LobbyName_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.LobbyName_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.LobbyType_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.LobbyType_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.PlayerTTL_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.PlayerTTL_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Plugins_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.Plugins_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.PublishUserId_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.PublishUserId_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.RoomFlags_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.RoomFlags_JoinGameRequest, obj);
+        }
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.WebFlags_JoinGameRequest, out obj))
+        {
+            Log.Information("JoinGame: {ByteCode} = {Obj}", ParameterCodesEnum.WebFlags_JoinGameRequest, obj);
+        }
+        #endregion
+
+        return new()
+        {
+            OperationCode = opReq.OperationCode,
+            ReturnCode = 0,
+            Parameters = new()
+            {
+                { (byte)ParameterCodesEnum.Address_JoinGameResponse, "127.0.0.1:5000" },
+                { (byte)ParameterCodesEnum.AuthenticationToken_JoinGameResponse, $"TokenForGameId_{GameId}_{GameManager.GetGameCount()}" }
+            }
         };
     }
 }

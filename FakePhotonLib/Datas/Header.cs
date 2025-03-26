@@ -2,7 +2,7 @@
 
 namespace FakePhotonLib.BinaryData;
 
-public class Header
+public class Header : ICloneable
 {
     internal EndPoint? EndPoint;
     public bool IsServer => PeerId == 0;
@@ -45,5 +45,10 @@ public class Header
     public override string ToString()
     {
         return $"Is Sent by Server: {IsServer} PeerId: {PeerId:x2} CrcOrEncrypted: {CrcOrEncrypted} CommandCount: {CommandCount} ServerTime: {ServerTime:x2} Challenge: {Challenge:x2}";
+    }
+
+    public object Clone()
+    {
+        return MemberwiseClone();
     }
 }

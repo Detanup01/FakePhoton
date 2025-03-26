@@ -10,6 +10,8 @@ public class PacketManager
 {
     public static Dictionary<short, EndPoint> PeerToEndPoint = [];
 
+    public static Dictionary<int, List<int>> DoNotProcessReliablePacketIds = [];
+
     public static void IncommingProcess(EndPoint endpoint, UdpServer server, byte[] data)
     {
         using BinaryReader binaryReader = new(new MemoryStream(data));
@@ -70,13 +72,15 @@ public class PacketManager
                     Size = 20,
                     ReliableSequenceNumber = 0,
                     ReservedByte = 0,
-                    ChannelID = 255
+                    ChannelID = command.ChannelID,
                 });
             }
             if (command.messageAndCallback != null)
             {
+                if (DoNotProcessReliablePacketIds.TryGetValue(header.Challenge, out var rsn) && rsn.Contains(command.ReliableSequenceNumber))
+                    continue;
                 Log.Information("Replying with messageAndCallback!");
-                var new_callback = MessageManager.Parse(command.messageAndCallback);
+                var new_callback = MessageManager.Parse(command.messageAndCallback, endpoint);
                 header.Commands.Add(new CommandPacket()
                 {
                     commandType = CommandType.SendReliable,
@@ -87,6 +91,11 @@ public class PacketManager
                     messageAndCallback = new_callback,
                     ReservedByte = 0,
                 });
+                if (!DoNotProcessReliablePacketIds.ContainsKey(header.Challenge))
+                {
+                    DoNotProcessReliablePacketIds.Add(header.Challenge, new());
+                }
+                DoNotProcessReliablePacketIds[header.Challenge].Add(command.ReliableSequenceNumber);
             }
             if (command.commandType == CommandType.Connect)
             {
@@ -112,7 +121,11 @@ public class PacketManager
             Log.Information("No commands to send!");
             return;
         }
+        Send(endpoint, header, server);
+    }
 
+    public static void Send(EndPoint endpoint, Header header, UdpServer server)
+    {
         using MemoryStream out_BigStream = new();
         using BinaryWriter out_writer = new(out_BigStream);
         header.CommandCount = (byte)header.Commands.Count;

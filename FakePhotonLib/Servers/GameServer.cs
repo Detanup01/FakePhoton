@@ -23,6 +23,8 @@ public class GameServer(IPAddress address, int port) : UdpServer(address, port)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
         Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", nameof(GameServer), endpoint, Convert.ToHexString(buf));
+        if (buf.Length == 0)
+            return;
         PacketManager.IncommingProcess(endpoint, this, buf);
         ReceiveAsync();
     }
