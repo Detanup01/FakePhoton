@@ -1,5 +1,5 @@
-﻿using FakePhotonLib.Managers;
-using FakePhotonLib.PhotonRelated;
+﻿using FakePhotonLib.Datas;
+using FakePhotonLib.Managers;
 using FakePhotonLib.Protocols;
 using Serilog;
 
@@ -21,14 +21,8 @@ public enum RtsMessageType : byte
 
 public class MessageAndCallback : ICloneable
 {
-    public MessageAndCallback()
-    {
-        Challenge = 0;
-    }
-    public MessageAndCallback(int challenge)
-    {
-        Challenge = challenge;
-    }
+    public ClientPeer? peer;
+
     public RtsMessageType MessageType;
     public int Challenge;
     public bool IsNotValid;
@@ -57,7 +51,12 @@ public class MessageAndCallback : ICloneable
         bool flag7 = b3 != 1;
         if (IsEncrypted)
         {
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
+            if (peer == null)
+            {
+                Log.Error("Peer is null!! cannot decrypt encrypted packet!");
+                return;
+            }
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer, out var cryptoProvider))
             {
                 Log.Error("This should not throw!");
                 return;
@@ -113,7 +112,12 @@ public class MessageAndCallback : ICloneable
             Protocol.ProtocolDefault.SerializeMessage(dataWriter, disconnectMessage);
         if (IsEncrypted)
         {
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(Challenge, out var cryptoProvider))
+            if (peer == null)
+            {
+                Log.Error("Peer is null!! cannot encrypt packet!");
+                return;
+            }
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer, out var cryptoProvider))
             {
                 Log.Error("This should not throw!");
                 return;

@@ -1,6 +1,7 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Protocols;
 using Serilog;
+using System.Collections;
 
 namespace FakePhotonLib.PacketAnalyzer;
 
@@ -42,6 +43,8 @@ public static class Analyze
 
     public static void SinglePacket(string packetAsHex)
     {
+        // TODO: Create fake peers
+
         using MemoryStream ms = new MemoryStream(Convert.FromHexString(packetAsHex));
         using BinaryReader binaryReader = new BinaryReader(ms);
         Header header = new();
@@ -56,7 +59,7 @@ public static class Analyze
             
             if (packet.Payload != null)
             {
-                MessageAndCallback messageAndCallback = new(header.Challenge);
+                MessageAndCallback messageAndCallback = new();
                 try
                 {
                     using BinaryReader payload_reader = new BinaryReader(new MemoryStream(packet.Payload));
@@ -81,6 +84,19 @@ public static class Analyze
             foreach (var item in req.Parameters)
             {
                 Log.Information("Req! Key: {Key} Value: {Value}", item.Key, item.Value);
+                if (item.Value != null && item.Value.GetType() == typeof(Hashtable))
+                {
+                    Hashtable ht = (Hashtable)item.Value;
+                    
+                    foreach (var item1 in ht.Keys)
+                    {
+                        Log.Information("HT! Key: {Key} Value: {Value}", item1, ht[item1]);
+                        if (ht[item1] != null &&  ht[item1]!.GetType() == typeof(string[]))
+                        {
+                            Log.Information("HT! stringArray: {array}", string.Join(", ", (string[])ht[item1]!));
+                        }
+                    }
+                }
             }
         }
         catch (Exception)
@@ -95,6 +111,14 @@ public static class Analyze
             foreach (var item in rsp.Parameters)
             {
                 Log.Information("Rsp! Key: {Key} Value: {Value}", item.Key, item.Value);
+                if (item.Value != null && item.Value.GetType() == typeof(Hashtable))
+                {
+                    Hashtable ht = (Hashtable)item.Value;
+                    foreach (var item1 in ht.Keys)
+                    {
+                        Log.Information("HT! Key: {Key} Value: {Value}", item1, ht[item1]);
+                    }
+                }
             }
         }
         catch (Exception)
@@ -109,6 +133,14 @@ public static class Analyze
             foreach (var item in ev.Parameters)
             {
                 Log.Information("Event! Key: {Key} Value: {Value}", item.Key, item.Value);
+                if (item.Value != null && item.Value.GetType() == typeof(Hashtable))
+                {
+                    Hashtable ht = (Hashtable)item.Value;
+                    foreach (var item1 in ht.Keys)
+                    {
+                        Log.Information("HT! Key: {Key} Value: {Value}", item1, ht[item1]);
+                    }
+                }
             }
         }
         catch (Exception)

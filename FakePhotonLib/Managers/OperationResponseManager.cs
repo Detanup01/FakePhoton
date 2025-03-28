@@ -1,4 +1,5 @@
 ﻿using FakePhotonLib.BinaryData;
+using FakePhotonLib.Datas;
 using FakePhotonLib.Encryptions;
 using Serilog;
 
@@ -6,15 +7,15 @@ namespace FakePhotonLib.Managers;
 
 public static class OperationResponseManager
 {
-    public static void Parse(int challenge, OperationResponse operationResponse)
+    public static void Parse(ClientPeer peer, OperationResponse operationResponse)
     {
         if (operationResponse.OperationCode == 0) // InitEncryption
         {
-            InitEncryption(challenge, operationResponse);
+            InitEncryption(peer, operationResponse);
         }
     }
 
-    internal static void InitEncryption(int challenge, OperationResponse operationResponse)
+    internal static void InitEncryption(ClientPeer peer, OperationResponse operationResponse)
     {
         if (operationResponse.ReturnCode != 0)
         {
@@ -29,9 +30,9 @@ public static class OperationResponseManager
             return;
         }
         Log.Information("Key: " + Convert.ToHexString(data));
-        EncryptionManager.EncryptionByChallenge.Remove(challenge, out _);
+        EncryptionManager.EncryptionByChallenge.Remove(peer, out _);
         DiffieHellmanCryptoProvider encryption = new();
         encryption.DeriveSharedKeyAsClient(data);
-        EncryptionManager.EncryptionByChallenge.Add(challenge, encryption);
+        EncryptionManager.EncryptionByChallenge.Add(peer, encryption);
     }
 }

@@ -39,25 +39,25 @@ public static class GameManager
         if (props.ContainsKey((byte)ParameterCodesEnum.GameProperties_JoinGameRequest))
         {
             Hashtable table = (Hashtable)props[(byte)ParameterCodesEnum.GameProperties_JoinGameRequest]!;
-            if (table.ContainsKey((byte)255))
+            if (table.ContainsKey(GameParameters.MaxPlayers))
             {
-                game.MaxPlayer = (byte)table[(byte)255]!;
+                game.MaxPlayer = (byte)table[GameParameters.MaxPlayers]!;
             }
-            if (table.ContainsKey((byte)243)) //?
+            if (table.ContainsKey(GameParameters.ExpectedMaxPlayers))
             {
-                //game.MaxPlayer = (byte)table[(byte)255]!;
+                game.ExpectedMaxPlayer = (byte)table[GameParameters.ExpectedMaxPlayers]!;
             }
-            if (table.ContainsKey((byte)250)) // Properties
+            if (table.ContainsKey(GameParameters.LobbyProperties))
             {
-                Log.Information("{info}", string.Join(", ", (string[])table[(byte)250]!));
+                Log.Information("{info}", string.Join(", ", (string[])table[GameParameters.LobbyProperties]!));
             }
-            if (table.ContainsKey((byte)254)) // IsVisible
+            if (table.ContainsKey(GameParameters.IsVisible))
             {
-                game.IsVisible = (bool)table[(byte)254]!;
+                game.IsVisible = (bool)table[GameParameters.IsVisible]!;
             }
-            if (table.ContainsKey((byte)253)) // IsVisible
+            if (table.ContainsKey(GameParameters.IsOpen))
             {
-                game.IsOpen = (bool)table[(byte)253]!;
+                game.IsOpen = (bool)table[GameParameters.IsOpen]!;
             }
         }
 
@@ -65,5 +65,14 @@ public static class GameManager
         {
             game.RoomFlags = (byte)props[(byte)ParameterCodesEnum.RoomFlags_JoinGameRequest]!;
         }
+    }
+
+    public static Hashtable GetHashtableFromGame(string id)
+    {
+        int idx = Games.FindIndex(x => x.Id == id);
+        if (idx != -1)
+            return new();
+        var game = Games[idx];
+        return game.ToFullHashTable();
     }
 }

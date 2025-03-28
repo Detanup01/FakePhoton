@@ -1,10 +1,7 @@
-﻿using System.Net;
-
-namespace FakePhotonLib.BinaryData;
+﻿namespace FakePhotonLib.BinaryData;
 
 public class Header : ICloneable
 {
-    internal EndPoint? EndPoint;
     public bool IsServer => PeerId == 0;
     public short PeerId = -1;
     public byte CrcOrEncrypted;
