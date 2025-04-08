@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using FakePhotonLib.Datas;
+using System.Collections;
 
 namespace FakePhotonLib.BinaryData;
 
@@ -18,7 +19,7 @@ public class GameData
     public byte PlayerCount => (byte)(ActiveUserIds.Count + ExpectedUserIds.Count + InactiveUserIds.Count);
     public string? Password { get; set; } = null;
     public ActorsProperties ActorsProperties { get; set; } = new();
-
+    public List<ClientPeer> Peers { get; set; } = [];
     public byte RoomFlags { get; set; }
 
     public Hashtable ToHashTable()
@@ -49,6 +50,22 @@ public class GameData
         h[GameParameters.ExpectedMaxPlayers] = ExpectedMaxPlayer;
         h[GameParameters.IsVisible] = IsVisible;
         h[GameParameters.IsOpen] = IsOpen;
+        // 250
+        // PASSWORD
+        // curScn
+        return h;
+    }
+
+    public Hashtable GetUserHashTable()
+    {
+        Hashtable h = new();
+        for (int i = ActorsProperties.Nicknames.Count; i > 0; i--)
+        {
+            h[(byte)i] = new Hashtable()
+            {
+                { 255, ActorsProperties.Nicknames[i] } 
+            };
+        }
         return h;
     }
 }

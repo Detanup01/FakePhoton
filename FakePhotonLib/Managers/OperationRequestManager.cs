@@ -225,16 +225,30 @@ public static class OperationRequestManager
 
         if (!IsGameExisted)
         {
+            // Add event!
+            var evenCode = new EventData()
+            { 
+                Code = opReq.OperationCode,
+                Parameters =
+                {
+                    { 229, 1  }, // PlayersInRoomsCount | FAKE!
+                    { 228, 1  }, // RoomsCount | FAKE!
+                    { 227, 1  }, // PlayersOnMasterCount | FAKE!
+                }
+            };
+
             return new()
             {
                 OperationCode = opReq.OperationCode,
                 ReturnCode = 0,
                 Parameters = new()
                 {
-                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, 1 },
+                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, GameManager.GetGame(GameId).PlayerCount },
                     { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, GameManager.GetHashtableFromGame(GameId) },
-                    { (byte)ParameterCodesEnum.Actors_Common, (int[])[1] },
-                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, 35 },
+                    { (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
+                    { (byte)ParameterCodesEnum.Actors_Common, (int[])[1] }, // TODO This!
+                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, GameManager.GetGame(GameId).RoomFlags },
+                    // Repo sending 200 and 201. This is Plugin info related stuff. Dont need to add it.
                 }
             };
         }

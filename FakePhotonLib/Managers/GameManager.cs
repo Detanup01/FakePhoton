@@ -1,4 +1,5 @@
 ﻿using FakePhotonLib.BinaryData;
+using FakePhotonLib.Datas;
 using Serilog;
 using System.Collections;
 
@@ -8,11 +9,11 @@ public static class GameManager
 {
     static List<GameData> Games = [];
 
-    public static void Create(string Id)
+    public static void Create(string id)
     {
         Games.Add(new GameData()
         { 
-            Id = Id,
+            Id = id,
             CreatedAt = DateTime.Now,
         });
     }
@@ -23,10 +24,7 @@ public static class GameManager
 
     public static void ChangeGame(string id, Dictionary<byte, object?> props)
     {
-        int idx = Games.FindIndex(x=>x.Id == id);
-        if (idx != -1)
-            return;
-        var game = Games[idx];
+        var game = GetGame(id);
 
         if (props.ContainsKey((byte)ParameterCodesEnum.ActorProperties_Common))
         {
@@ -65,14 +63,54 @@ public static class GameManager
         {
             game.RoomFlags = (byte)props[(byte)ParameterCodesEnum.RoomFlags_JoinGameRequest]!;
         }
+
+        // 250 = OnGameServer (bool)
+        // 241 = CleanupAfterLeave (bool)
+        // 232 = CheckUserOnJoin (bool)
+    }
+
+    public static void JoinGamePeer(string id, ClientPeer peer)
+    {
+        GetGame(id).Peers.Add(peer);
+        foreach (var item in GetGame(id).Peers)
+        {
+            Header header = new()
+            {
+                CrcOrEncrypted = 0,
+                PeerId = 0,
+                Commands = [],
+                ServerTime = Environment.TickCount,
+                Challenge = item.challenge,
+            };
+            header.Commands.Add(new()
+            { 
+                commandType = CommandType.SendReliable,
+                ChannelID = 255,
+                ReliableSequenceNumber = 1,
+            });
+        }
+    }
+
+    public static void LeaveGamePeer(string id, ClientPeer peer)
+    {
+        GetGame(id).Peers.Remove(peer);
     }
 
     public static Hashtable GetHashtableFromGame(string id)
     {
+        return GetGame(id).ToFullHashTable();
+    }
+
+
+    public static GameData GetGame(string id)
+    {
         int idx = Games.FindIndex(x => x.Id == id);
         if (idx != -1)
-            return new();
-        var game = Games[idx];
-        return game.ToFullHashTable();
+            return new()
+            {
+                Id = id,
+                CreatedAt = DateTime.Now,
+            };
+        return Games[idx];
     }
 }
