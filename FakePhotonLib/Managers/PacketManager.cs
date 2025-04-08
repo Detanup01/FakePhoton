@@ -169,7 +169,7 @@ public class PacketManager
                 writer.Flush();
                 commandPacket.Size += (int)writer.BaseStream.Length;
                 commandPacket.Payload = ms.ToArray();
-                //Log.Information("Command payload is now: {payload}", Convert.ToHexString(commandPacket.Payload));
+                Log.Information("Command payload is now: {payload}", Convert.ToHexString(commandPacket.Payload));
                 ms.SetLength(0);
             }
             commandPacket.Write(out_writer);

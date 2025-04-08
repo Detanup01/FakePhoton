@@ -1,4 +1,5 @@
 ﻿using FakePhotonLib.Datas;
+using Serilog;
 using System.Collections;
 
 namespace FakePhotonLib.BinaryData;
@@ -8,7 +9,7 @@ public class GameData
     public string Id { get; set; } = string.Empty;
     public byte MaxPlayer { get; set; }
     public byte ExpectedMaxPlayer { get; set; } = 20;
-    public bool IsOpen { get; set; }
+    public bool IsOpen { get; set; } = true;
     public bool IsVisible { get; set; }
     public DateTime CreatedAt { get; set; }
     public Dictionary<object, object> Properties { get; set; } = [];
@@ -38,9 +39,10 @@ public class GameData
 
     public Hashtable ToFullHashTable()
     {
-        Hashtable h = new();
+        Hashtable h = [];
         foreach (var keyValue in Properties)
         {
+            Log.Information("{Key} = {Value}", keyValue.Key, keyValue.Value);
             h.Add(keyValue.Key, keyValue.Value);
         }
         h[GameParameters.MaxPlayers] = MaxPlayer;

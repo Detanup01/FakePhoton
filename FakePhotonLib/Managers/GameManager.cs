@@ -22,7 +22,7 @@ public static class GameManager
 
     public static bool IsGameExist(string id) => Games.Any(x => x.Id == id);
 
-    public static void ChangeGame(string id, Dictionary<byte, object?> props)
+    public static void ChangeGame(ClientPeer peer, string id, Dictionary<byte, object?> props)
     {
         var game = GetGame(id);
 
@@ -43,11 +43,12 @@ public static class GameManager
             }
             if (table.ContainsKey(GameParameters.ExpectedMaxPlayers))
             {
-                game.ExpectedMaxPlayer = (byte)table[GameParameters.ExpectedMaxPlayers]!;
+                game.ExpectedMaxPlayer = (byte)(int)table[GameParameters.ExpectedMaxPlayers]!;
             }
             if (table.ContainsKey(GameParameters.LobbyProperties))
             {
-                Log.Information("{info}", string.Join(", ", (string[])table[GameParameters.LobbyProperties]!));
+                string[] properties = (string[])table[GameParameters.LobbyProperties]!;
+                Log.Information("{info} {Len}", string.Join(", ", properties), properties.Length);
             }
             if (table.ContainsKey(GameParameters.IsVisible))
             {
@@ -61,12 +62,14 @@ public static class GameManager
 
         if (props.ContainsKey((byte)ParameterCodesEnum.RoomFlags_JoinGameRequest))
         {
-            game.RoomFlags = (byte)props[(byte)ParameterCodesEnum.RoomFlags_JoinGameRequest]!;
+            game.RoomFlags = (byte)(int)props[(byte)ParameterCodesEnum.RoomFlags_JoinGameRequest]!;
         }
 
         // 250 = OnGameServer (bool)
         // 241 = CleanupAfterLeave (bool)
         // 232 = CheckUserOnJoin (bool)
+
+        game.ExpectedUserIds.Add(peer.UserId == null ? peer.challenge.ToString() : peer.UserId);
     }
 
     public static void JoinGamePeer(string id, ClientPeer peer)

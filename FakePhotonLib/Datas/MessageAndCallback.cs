@@ -2,6 +2,7 @@
 using FakePhotonLib.Managers;
 using FakePhotonLib.Protocols;
 using Serilog;
+using System.Security.Cryptography;
 
 namespace FakePhotonLib.BinaryData;
 public enum RtsMessageType : byte
@@ -56,9 +57,9 @@ public class MessageAndCallback : ICloneable
                 Log.Error("Peer is null!! cannot decrypt encrypted packet!");
                 return;
             }
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer, out var cryptoProvider))
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.challenge, out var cryptoProvider))
             {
-                Log.Error("This should not throw!");
+                Log.Error("This should not throw (Read IsEncrypted)!");
                 return;
             }
             var data = cryptoProvider.Decrypt(reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position)));
@@ -93,10 +94,15 @@ public class MessageAndCallback : ICloneable
 
     public void Write(BinaryWriter writer)
     {
+        Log.Information("M A C Writer!");
         writer.Write((byte)243);
         var msg_type = (byte)MessageType;
         if (IsEncrypted)
+        {
             msg_type |= 128;
+            Log.Information("Sending IsEncrypted!");
+        }
+            
         writer.Write(msg_type);
 
         using MemoryStream ms = new();
@@ -110,6 +116,30 @@ public class MessageAndCallback : ICloneable
             Protocol.ProtocolDefault.SerializeEventData(dataWriter, eventData, false);
         if (disconnectMessage != null)
             Protocol.ProtocolDefault.SerializeMessage(dataWriter, disconnectMessage);
+        Log.Information("Testing packet deser");
+        byte[] data = ms.ToArray();
+        try
+        {
+            if (operationResponse != null)
+            {
+                var rsp = Protocol.ProtocolDefault.DeserializeOperationResponse(new(new MemoryStream(data)));
+                Log.Information("{Rsp}", rsp);
+            }
+            if (operationRequest != null)
+            {
+                var rsp = Protocol.ProtocolDefault.DeserializeOperationRequest(new(new MemoryStream(data)));
+                Log.Information("{Rsp}", rsp);
+            }
+            if (eventData != null)
+            {
+                var rsp = Protocol.ProtocolDefault.DeserializeEventData(new(new MemoryStream(data)));
+                Log.Information("{Rsp}", rsp);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("{ERROR}", ex);
+        }
         if (IsEncrypted)
         {
             if (peer == null)
@@ -117,15 +147,15 @@ public class MessageAndCallback : ICloneable
                 Log.Error("Peer is null!! cannot encrypt packet!");
                 return;
             }
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer, out var cryptoProvider))
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.challenge, out var cryptoProvider))
             {
-                Log.Error("This should not throw!");
+                Log.Error("This should not throw! (EncryptionByChallenge)");
                 return;
             }
-            writer.Write(cryptoProvider.Encrypt(ms.ToArray()));
+            writer.Write(cryptoProvider.Encrypt(data));
         }
         else
-            writer.Write(ms.ToArray());
+            writer.Write(data);
     }
 
     public void Reset()
@@ -143,7 +173,7 @@ public class MessageAndCallback : ICloneable
     {
         string? oprespone = operationResponse == null ? string.Empty : operationResponse.ToString();
         string? op_request = operationRequest == null ? string.Empty : operationRequest.ToString();
-        return $"IsNotValid: {IsNotValid} {MessageType} {IsInit.HasValue} {oprespone} {op_request}";
+        return $"IsNotValid: {IsNotValid} {MessageType} {IsInit.HasValue} {IsEncrypted} {oprespone} {op_request}";
     }
 
     public object Clone()

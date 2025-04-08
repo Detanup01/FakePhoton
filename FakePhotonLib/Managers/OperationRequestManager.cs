@@ -1,6 +1,7 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Datas;
 using Serilog;
+using System.Collections;
 using System.Net;
 
 namespace FakePhotonLib.Managers;
@@ -141,7 +142,7 @@ public static class OperationRequestManager
             GameManager.Create(GameId);
         else
         {
-            GameManager.ChangeGame(GameId, opReq.Parameters);
+            GameManager.ChangeGame(peer, GameId, opReq.Parameters);
         }
         #region x
         if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.ActorNr_JoinGameRequest,out obj))
@@ -223,7 +224,7 @@ public static class OperationRequestManager
         #endregion
 
 
-        if (!IsGameExisted)
+        if (IsGameExisted)
         {
             // Add event!
             var evenCode = new EventData()
@@ -236,18 +237,20 @@ public static class OperationRequestManager
                     { 227, 1  }, // PlayersOnMasterCount | FAKE!
                 }
             };
-
+            
+            var hashTable = GameManager.GetHashtableFromGame(GameId);
+            Log.Information("{HashTable}", hashTable);
             return new()
             {
                 OperationCode = opReq.OperationCode,
                 ReturnCode = 0,
                 Parameters = new()
                 {
-                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, GameManager.GetGame(GameId).PlayerCount },
-                    { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, GameManager.GetHashtableFromGame(GameId) },
-                    { (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
+                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, (byte)GameManager.GetGame(GameId).PlayerCount },
+                    { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, (Hashtable)hashTable},
+                    //{ (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
                     { (byte)ParameterCodesEnum.Actors_Common, (int[])[1] }, // TODO This!
-                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, GameManager.GetGame(GameId).RoomFlags },
+                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, (byte)GameManager.GetGame(GameId).RoomFlags },
                     // Repo sending 200 and 201. This is Plugin info related stuff. Dont need to add it.
                 }
             };
