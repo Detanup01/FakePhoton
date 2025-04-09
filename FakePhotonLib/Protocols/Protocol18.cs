@@ -934,7 +934,7 @@ public class Protocol18 : IProtocol
         stream.Write(Encoding.UTF8.GetBytes(value));
     }
 
-    private void WriteHashtable(BinaryWriter stream, object value, bool writeType)
+    public void WriteHashtable(BinaryWriter stream, object value, bool writeType)
     {
         Hashtable hashtable = (Hashtable)value;
         if (writeType) stream.Write((byte)21);
@@ -1285,6 +1285,7 @@ public class Protocol18 : IProtocol
 
     private static void WriteCompressedInt32(BinaryWriter stream, int value, bool writeType)
     {
+        
         if (writeType)
         {
             if (value == 0)
@@ -1302,7 +1303,7 @@ public class Protocol18 : IProtocol
                 }
                 if (value <= ushort.MaxValue)
                 {
-                    stream.Write(13);
+                    stream.Write((byte)13);
                     WriteUShort(stream, (ushort)value);
                     return;
                 }
@@ -1318,7 +1319,7 @@ public class Protocol18 : IProtocol
                 if (value >= -65535)
                 {
                     stream.Write((byte)14);
-                    WriteUShort(stream, (ushort)-value);
+                    WriteUShort(stream, (ushort)-((ushort)value));
                     return;
                 }
             }
@@ -1329,6 +1330,7 @@ public class Protocol18 : IProtocol
 
     private static void WriteCompressedInt64(BinaryWriter stream, long value, bool writeType)
     {
+        
         if (writeType)
         {
             if (value == 0)
@@ -1367,7 +1369,7 @@ public class Protocol18 : IProtocol
                 }
             }
         }
-        if (writeType) stream.Write(10);
+        if (writeType) stream.Write((byte)10);
         WriteCompressedUInt64(stream, EncodeZigZag64(value));
     }
 

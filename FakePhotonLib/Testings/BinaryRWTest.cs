@@ -3,6 +3,7 @@ using FakePhotonLib.Encryptions;
 using FakePhotonLib.Protocols;
 using Serilog;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -92,6 +93,36 @@ public class BinaryRWTest
         using BinaryReader binaryReader = new(new MemoryStream(data));
 
         var des = Protocol.ProtocolDefault.DeserializeOperationResponse(binaryReader);
+
+        Console.WriteLine(des);
+        Console.WriteLine(des.GetType());
+    }
+
+    public static void protocol18_hashtable_test()
+    {
+        Protocol18 protocol18 = new();
+
+        Hashtable hashtable = new()
+        {
+            { (byte)254, true },
+            { (byte)253, false },
+            { (byte)248, 1 },
+            { (byte)246, 53255 },
+            { (byte)245, 0 },
+            { (byte)243, (byte)20 },
+            { (byte)255, (byte)0 },
+        }; 
+        Console.WriteLine(hashtable);
+        using MemoryStream ms = new();
+        using BinaryWriter binaryWriter = new(ms);
+        protocol18.WriteHashtable(binaryWriter, hashtable, true);
+
+        byte[] data = ms.ToArray();
+        ms.Dispose();
+        Console.WriteLine(BitConverter.ToString(data).Replace("-", string.Empty));
+        using BinaryReader binaryReader = new(new MemoryStream(data));
+
+        var des = protocol18.Deserialize(binaryReader);
 
         Console.WriteLine(des);
         Console.WriteLine(des.GetType());
