@@ -22,6 +22,7 @@ public class GameData
     public ActorsProperties ActorsProperties { get; set; } = new();
     public List<ClientPeer> Peers { get; set; } = [];
     public byte RoomFlags { get; set; }
+    public List<string> GameProperties { get; set; } = new();
 
     public Hashtable ToHashTable()
     {
@@ -47,12 +48,12 @@ public class GameData
         }
         h[GameParameters.MaxPlayers] = MaxPlayer;
         h[GameParameters.MasterClientId] = 1;
-        h[GameParameters.PlayerTTL] = 53255;
+        h[GameParameters.PlayerTTL] = 0;
         h[GameParameters.EmptyRoomTTL] = 0;
-        h[GameParameters.ExpectedMaxPlayers] = ExpectedMaxPlayer;
+        h[GameParameters.ExpectedMaxPlayers] = (int)ExpectedMaxPlayer;
         h[GameParameters.IsVisible] = IsVisible;
         h[GameParameters.IsOpen] = IsOpen;
-        // 250
+        h[GameParameters.LobbyProperties] = GameProperties.ToArray();
         // PASSWORD
         // curScn
         return h;
@@ -94,4 +95,5 @@ public static class GameParameters
     public const byte PlayerTTL = 246;
     public const byte EmptyRoomTTL = 245;
     public const byte ExpectedMaxPlayers = 243;
+    public const byte PlayerCount = 252;
 }

@@ -8,8 +8,9 @@ namespace FakePhotonLib.Managers;
 
 public static class OperationRequestManager
 {
-    public static OperationResponse? Parse(ClientPeer peer, OperationRequest opReq)
+    public static OperationResponse? Parse(ClientPeer peer, OperationRequest opReq, out MessageAndCallback? optional)
     {
+        optional = null;
         if (opReq.OperationCode == (byte)OperationCodeEnum.ExchangeKeys)
         {
             return InitEncryption(peer, opReq);
@@ -24,7 +25,7 @@ public static class OperationRequestManager
         }
         if (opReq.OperationCode == (byte)OperationCodeEnum.JoinGame)
         {
-            return JoinGame(peer, opReq);
+            return JoinGame(peer, opReq, out optional);
         }
 
         Console.WriteLine("Request not found: " + opReq.OperationCode);
@@ -131,8 +132,9 @@ public static class OperationRequestManager
         };
     }
 
-    internal static OperationResponse JoinGame(ClientPeer peer, OperationRequest opReq)
+    internal static OperationResponse JoinGame(ClientPeer peer, OperationRequest opReq, out MessageAndCallback? optional)
     {
+        optional = null;
         object? obj = null;
 
         string GameId = (string)opReq.Parameters[(byte)ParameterCodesEnum.GameId_JoinGameRequest]!;
@@ -226,20 +228,11 @@ public static class OperationRequestManager
 
         if (IsGameExisted)
         {
-            // Add event!
-            var evenCode = new EventData()
-            { 
-                Code = opReq.OperationCode,
-                Parameters =
-                {
-                    { 229, 1  }, // PlayersInRoomsCount | FAKE!
-                    { 228, 1  }, // RoomsCount | FAKE!
-                    { 227, 1  }, // PlayersOnMasterCount | FAKE!
-                }
-            };
-            
-            var hashTable = GameManager.GetHashtableFromGame(GameId);
-            Log.Information("{HashTable}", hashTable);
+            // send event 255
+            Log.Information("ActorNr: {number}", GameManager.GetGame(GameId).PlayerCount);
+            Log.Information("GameProperties: {number}", GameManager.GetHashtableFromGame(GameId));
+            Log.Information("ActorProperties: {number}", GameManager.GetGame(GameId).GetUserHashTable());
+            Log.Information("RoomFlags: {number}", GameManager.GetGame(GameId).RoomFlags);
             return new()
             {
                 OperationCode = opReq.OperationCode,
@@ -247,14 +240,29 @@ public static class OperationRequestManager
                 Parameters = new()
                 {
                     { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, (byte)GameManager.GetGame(GameId).PlayerCount },
-                    { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, (Hashtable)hashTable},
-                    //{ (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
-                    { (byte)ParameterCodesEnum.Actors_Common, (int[])[1] }, // TODO This!
+                    { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, GameManager.GetHashtableFromGame(GameId)},
+                    { (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
+                    { (byte)ParameterCodesEnum.Actors_Common, new int[] { 1 } }, // TODO This!
                     { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, (byte)GameManager.GetGame(GameId).RoomFlags },
                     // Repo sending 200 and 201. This is Plugin info related stuff. Dont need to add it.
                 }
             };
         }
+        Log.Information("Sending player to join address!");
+        // Add event!
+        var evenCode = new EventData()
+        {
+            Code = opReq.OperationCode,
+            Parameters =
+                {
+                    { 229, 1  }, // PlayersInRoomsCount | FAKE!
+                    { 228, 1  }, // RoomsCount | FAKE!
+                    { 227, 1  }, // PlayersOnMasterCount | FAKE!
+                }
+        };
+        optional = new();
+        optional.eventData = evenCode;
+        optional.MessageType = RtsMessageType.Event;
         return new()
         {
             OperationCode = opReq.OperationCode,

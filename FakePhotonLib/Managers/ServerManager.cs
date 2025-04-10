@@ -11,7 +11,9 @@ public static class ServerManager
     {
         UDPServers.Add(new NameServer(System.Net.IPAddress.Loopback, 5058));
         UDPServers.Add(new MasterGameServer(System.Net.IPAddress.Loopback, 5055));
-        UDPServers.Add(new GameServer(System.Net.IPAddress.Loopback, 5000));
+        UDPServers.Add(new GameServer("Game",System.Net.IPAddress.Loopback, 5000));
+        UDPServers.Add(new GameServer("Voice", System.Net.IPAddress.Loopback, 5001));
+        // Add Voice Server!
 
         foreach (var server in UDPServers)
         {

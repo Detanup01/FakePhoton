@@ -57,7 +57,7 @@ public class MessageAndCallback : ICloneable
                 Log.Error("Peer is null!! cannot decrypt encrypted packet!");
                 return;
             }
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.challenge, out var cryptoProvider))
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.Challenge, out var cryptoProvider))
             {
                 Log.Error("This should not throw (Read IsEncrypted)!");
                 return;
@@ -147,7 +147,7 @@ public class MessageAndCallback : ICloneable
                 Log.Error("Peer is null!! cannot encrypt packet!");
                 return;
             }
-            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.challenge, out var cryptoProvider))
+            if (!EncryptionManager.EncryptionByChallenge.TryGetValue(peer.Challenge, out var cryptoProvider))
             {
                 Log.Error("This should not throw! (EncryptionByChallenge)");
                 return;

@@ -11,10 +11,10 @@ public static class EncryptionManager
     public static byte[] ExchangeKeys(ClientPeer peer, byte[] key)
     {
         Log.Information("Client Key: " + Convert.ToHexString(key));
-        EncryptionByChallenge.Remove(peer.challenge);
+        EncryptionByChallenge.Remove(peer.Challenge);
         DiffieHellmanCryptoProvider ServerEncryption = new();
         ServerEncryption.DeriveSharedKeyAsServer(key);
-        EncryptionByChallenge.Add(peer.challenge, ServerEncryption);
+        EncryptionByChallenge.Add(peer.Challenge, ServerEncryption);
         var server_key = ServerEncryption.PublicKeyAsServer;
         Log.Information("Server: " + ServerEncryption.ToString());
         return server_key;

@@ -6,22 +6,23 @@ namespace FakePhotonLib.Managers;
 
 public static class MessageManager
 {
-    public static MessageAndCallback Parse(ClientPeer peer, MessageAndCallback messageAndCallback)
+    public static MessageAndCallback Parse(ClientPeer peer, MessageAndCallback input, out MessageAndCallback? optional)
     {
-        MessageAndCallback ReturnMessage = (MessageAndCallback)messageAndCallback.Clone();
+        optional = null;
+        MessageAndCallback ReturnMessage = (MessageAndCallback)input.Clone();
         // This for checking client what sent.
-        if (messageAndCallback.operationResponse != null)
+        if (input.operationResponse != null)
         {
-            OperationResponseManager.Parse(peer, messageAndCallback.operationResponse);
+            OperationResponseManager.Parse(peer, input.operationResponse);
         }
 
-        if (messageAndCallback.operationRequest != null)
+        if (input.operationRequest != null)
         {
             ReturnMessage.Reset();
-            ReturnMessage.MessageType = messageAndCallback.MessageType == RtsMessageType.InternalOperationRequest ? RtsMessageType.InternalOperationResponse : RtsMessageType.OperationResponse;
-            ReturnMessage.operationResponse = OperationRequestManager.Parse(peer, messageAndCallback.operationRequest);
+            ReturnMessage.MessageType = input.MessageType == RtsMessageType.InternalOperationRequest ? RtsMessageType.InternalOperationResponse : RtsMessageType.OperationResponse;
+            ReturnMessage.operationResponse = OperationRequestManager.Parse(peer, input.operationRequest, out optional);
         }
-        if (messageAndCallback.IsInit != null)
+        if (input.IsInit != null)
         {
             ReturnMessage.Reset();
             ReturnMessage.MessageType = RtsMessageType.InitResponse;

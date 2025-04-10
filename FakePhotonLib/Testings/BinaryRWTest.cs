@@ -125,6 +125,6 @@ public class BinaryRWTest
         var des = protocol18.Deserialize(binaryReader);
 
         Console.WriteLine(des);
-        Console.WriteLine(des.GetType());
+        Console.WriteLine(des?.GetType());
     }
 }

@@ -30,9 +30,9 @@ public static class OperationResponseManager
             return;
         }
         Log.Information("Key: " + Convert.ToHexString(data));
-        EncryptionManager.EncryptionByChallenge.Remove(peer.challenge, out _);
+        EncryptionManager.EncryptionByChallenge.Remove(peer.Challenge, out _);
         DiffieHellmanCryptoProvider encryption = new();
         encryption.DeriveSharedKeyAsClient(data);
-        EncryptionManager.EncryptionByChallenge.Add(peer.challenge, encryption);
+        EncryptionManager.EncryptionByChallenge.Add(peer.Challenge, encryption);
     }
 }

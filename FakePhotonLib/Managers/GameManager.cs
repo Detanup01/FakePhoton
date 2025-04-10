@@ -47,8 +47,7 @@ public static class GameManager
             }
             if (table.ContainsKey(GameParameters.LobbyProperties))
             {
-                string[] properties = (string[])table[GameParameters.LobbyProperties]!;
-                Log.Information("{info} {Len}", string.Join(", ", properties), properties.Length);
+                game.GameProperties.AddRange((string[])table[GameParameters.LobbyProperties]!);
             }
             if (table.ContainsKey(GameParameters.IsVisible))
             {
@@ -69,7 +68,7 @@ public static class GameManager
         // 241 = CleanupAfterLeave (bool)
         // 232 = CheckUserOnJoin (bool)
 
-        game.ExpectedUserIds.Add(peer.UserId == null ? peer.challenge.ToString() : peer.UserId);
+        game.ExpectedUserIds.Add(peer.UserId == null ? peer.Challenge.ToString() : peer.UserId);
     }
 
     public static void JoinGamePeer(string id, ClientPeer peer)
@@ -83,7 +82,7 @@ public static class GameManager
                 PeerId = 0,
                 Commands = [],
                 ServerTime = Environment.TickCount,
-                Challenge = item.challenge,
+                Challenge = item.Challenge,
             };
             header.Commands.Add(new()
             { 

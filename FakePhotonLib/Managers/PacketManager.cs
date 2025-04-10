@@ -19,18 +19,22 @@ public class PacketManager
         Header header = new();
         header.Read(binaryReader);
         ClientPeer? peer = null;
-        if (Peers.Any(x=>x.server == server && x.endPoint == endpoint && x.challenge == header.Challenge))
+        if (Peers.Any(x=>x.Server == server && x.EndPoint == endpoint && x.Challenge == header.Challenge))
         {
-            var peerIndex = Peers.FindIndex(x => x.server == server && x.endPoint == endpoint && x.challenge == header.Challenge);
+            var peerIndex = Peers.FindIndex(x => x.Server == server && x.EndPoint == endpoint && x.Challenge == header.Challenge);
             peer = peerIndex == -1 ? null : Peers[peerIndex];
         }
         if (peer == null)
         {
             peer = new()
             { 
-                server = server,
-                endPoint = endpoint,
-                challenge = header.Challenge,
+                Server = server,
+                EndPoint = endpoint,
+                Challenge = header.Challenge,
+                LastUnreliableSequence =
+                {
+                    { server, 0 }
+                }
             };
             Peers.Add(peer);
         }
@@ -96,7 +100,7 @@ public class PacketManager
                 if (DoNotProcessReliablePacketIds.TryGetValue(header.Challenge, out var rsn) && rsn.Contains(command.ReliableSequenceNumber))
                     continue;
                 Log.Information("Replying with messageAndCallback!");
-                var new_callback = MessageManager.Parse(peer, command.messageAndCallback);
+                var new_callback = MessageManager.Parse(peer, command.messageAndCallback, out MessageAndCallback? optional);
                 header.Commands.Add(new CommandPacket()
                 {
                     commandType = CommandType.SendReliable,
@@ -107,6 +111,21 @@ public class PacketManager
                     messageAndCallback = new_callback,
                     ReservedByte = 0,
                 });
+                // This is always the event!
+                if (optional != null)
+                {
+                    header.Commands.Add(new CommandPacket()
+                    {
+                        commandType = CommandType.SendUnreliable,
+                        ReliableSequenceNumber = command.ReliableSequenceNumber,
+                        UnreliableSequenceNumber = peer.LastUnreliableSequence[peer.Server!]++,
+                        Size = 16,
+                        ChannelID = command.ChannelID,
+                        CommandFlags = 0,
+                        messageAndCallback = optional,
+                        ReservedByte = 0,
+                    });
+                }
                 if (!DoNotProcessReliablePacketIds.ContainsKey(header.Challenge))
                 {
                     DoNotProcessReliablePacketIds.Add(header.Challenge, []);
@@ -117,7 +136,7 @@ public class PacketManager
             {
                 Log.Information("Replying with VerifyConnect!");
                 var peerID = (short)RandomNumberGenerator.GetInt32(short.MaxValue);
-                peer.peerId = peerID;
+                peer.PeerId = peerID;
                 header.Commands.Add(new CommandPacket()
                 {
                     peerID = peerID,
@@ -128,6 +147,10 @@ public class PacketManager
                     ReservedByte = 0,
                     CommandFlags = 1,
                 });
+            }
+            if (command.commandType == CommandType.Disconnect)
+            {
+                DoNotProcessReliablePacketIds[header.Challenge].Clear();
             }
         }
 
@@ -141,12 +164,12 @@ public class PacketManager
 
     public static void Send(ClientPeer peer, Header header)
     {
-        if (peer.server == null)
+        if (peer.Server == null)
         {
             Log.Error("Peer does not have associated server!");
             return;
         }
-        if (peer.endPoint == null)
+        if (peer.EndPoint == null)
         {
             Log.Error("Peer does not have associated endpoint!");
             return;
@@ -178,9 +201,9 @@ public class PacketManager
 
         var packet = out_BigStream.ToArray();
 
-        Log.Information("Sending out packet {packet} {packetLen} to {address}", Convert.ToHexString(packet), packet.Length, peer.endPoint);
+        Log.Information("Sending out packet {packet} {packetLen} to {address}", Convert.ToHexString(packet), packet.Length, peer.EndPoint);
 
-        var sentBytes = peer.server.Send(peer.endPoint, packet);
+        var sentBytes = peer.Server.Send(peer.EndPoint, packet);
         Log.Information("Sent bytes: {sent}", sentBytes);
     }
 }
