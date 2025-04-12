@@ -46,14 +46,16 @@ public class GameData
             Log.Information("{Key} = {Value}", keyValue.Key, keyValue.Value);
             h.Add(keyValue.Key, keyValue.Value);
         }
-        h[GameParameters.MaxPlayers] = MaxPlayer;
+        h[GameParameters.LobbyProperties] = GameProperties.ToArray();
         h[GameParameters.MasterClientId] = 1;
         h[GameParameters.PlayerTTL] = 0;
         h[GameParameters.EmptyRoomTTL] = 0;
         h[GameParameters.ExpectedMaxPlayers] = (int)ExpectedMaxPlayer;
+        //h["PASSWORD"] = null;
+        h[GameParameters.MaxPlayers] = MaxPlayer;
         h[GameParameters.IsVisible] = IsVisible;
         h[GameParameters.IsOpen] = IsOpen;
-        h[GameParameters.LobbyProperties] = GameProperties.ToArray();
+
         // PASSWORD
         // curScn
         return h;
@@ -62,9 +64,9 @@ public class GameData
     public Hashtable GetUserHashTable()
     {
         Hashtable h = new();
-        for (int i = ActorsProperties.Nicknames.Count; i > 0; i--)
+        for (int i = 0; i < ActorsProperties.Nicknames.Count; i++)
         {
-            h[(byte)i] = new Hashtable()
+            h[(byte)i+1] = new Hashtable()
             {
                 { 255, ActorsProperties.Nicknames[i] } 
             };

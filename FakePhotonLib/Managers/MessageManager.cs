@@ -6,7 +6,7 @@ namespace FakePhotonLib.Managers;
 
 public static class MessageManager
 {
-    public static MessageAndCallback Parse(ClientPeer peer, MessageAndCallback input, out MessageAndCallback? optional)
+    public static MessageAndCallback Parse(ClientPeer peer, MessageAndCallback input, out (MessageAndCallback, CommandType)? optional)
     {
         optional = null;
         MessageAndCallback ReturnMessage = (MessageAndCallback)input.Clone();

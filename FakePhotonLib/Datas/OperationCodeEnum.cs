@@ -21,7 +21,7 @@ public enum OperationCodeEnum : byte
     Ping = 249,
     GetProperties = 251,
     SetProperties = 252,
-    RaiseEvent = 254,
+    RaiseEvent = 253,
     Leave = 254,
     Join = 255
 }

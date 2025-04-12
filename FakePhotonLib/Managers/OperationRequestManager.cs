@@ -1,14 +1,13 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Datas;
+using FakePhotonLib.Servers;
 using Serilog;
-using System.Collections;
-using System.Net;
 
 namespace FakePhotonLib.Managers;
 
 public static class OperationRequestManager
 {
-    public static OperationResponse? Parse(ClientPeer peer, OperationRequest opReq, out MessageAndCallback? optional)
+    public static OperationResponse? Parse(ClientPeer peer, OperationRequest opReq, out (MessageAndCallback, CommandType)? optional)
     {
         optional = null;
         if (opReq.OperationCode == (byte)OperationCodeEnum.ExchangeKeys)
@@ -62,7 +61,7 @@ public static class OperationRequestManager
     internal static OperationResponse GetRegionList(ClientPeer peer, OperationRequest opReq)
     {
         string[] region = ["eu"];
-        string[] endpoints = ["127.0.0.1:5505"]; // todo make a config var
+        string[] endpoints = ["127.0.0.1:5505"]; // todo make a config var | Must be MasterGameServer
         return new()
         {
             OperationCode = opReq.OperationCode,
@@ -117,6 +116,16 @@ public static class OperationRequestManager
             };
         }
         var token = opReq.Parameters[(byte)ParameterCodesEnum.Token_AuthenticateRequest];
+        var con = peer.GetLastConnection();
+        if (con != null && con!.Server.GetType() == typeof(GameServer))
+        {
+            return new()
+            {
+                OperationCode = opReq.OperationCode,
+                ReturnCode = 0,
+            };
+        }
+
         return new()
         {
             OperationCode = opReq.OperationCode,
@@ -124,15 +133,15 @@ public static class OperationRequestManager
             Parameters = new()
             {
                 { (byte)ParameterCodesEnum.QueuePosition_AuthenticateResponse, 0 },
-                { (byte)ParameterCodesEnum.MasterEndpoint_AuthenticateResponse, "127.0.0.1:5055" },
+                //{ (byte)ParameterCodesEnum.MasterEndpoint_AuthenticateResponse, "127.0.0.1:5055" },
                 { (byte)ParameterCodesEnum.AuthenticationToken_AuthenticateResponse, token },
-                { (byte)ParameterCodesEnum.UserId_AuthenticateResponse, ((string)token!).Split("_")[1] },
+                //{ (byte)ParameterCodesEnum.UserId_AuthenticateResponse, ((string)token!).Split("_")[1] },
             },
             DebugMessage = null,
         };
     }
 
-    internal static OperationResponse JoinGame(ClientPeer peer, OperationRequest opReq, out MessageAndCallback? optional)
+    internal static OperationResponse JoinGame(ClientPeer peer, OperationRequest opReq, out (MessageAndCallback, CommandType)? optional)
     {
         optional = null;
         object? obj = null;
@@ -229,6 +238,20 @@ public static class OperationRequestManager
         if (IsGameExisted)
         {
             // send event 255
+            optional = new(new()
+            {
+                eventData = new()
+                {
+                    Code = 255,
+                    Parameters =
+                    {
+                        { 249, opReq.Parameters[249]  },
+                        { 252, new int[] { 1 }  },
+                        { 254, (int)GameManager.GetGame(GameId).PlayerCount  },
+                    }
+                },
+                MessageType = RtsMessageType.Event,
+            },CommandType.SendReliable);
             Log.Information("ActorNr: {number}", GameManager.GetGame(GameId).PlayerCount);
             Log.Information("GameProperties: {number}", GameManager.GetHashtableFromGame(GameId));
             Log.Information("ActorProperties: {number}", GameManager.GetGame(GameId).GetUserHashTable());
@@ -239,30 +262,31 @@ public static class OperationRequestManager
                 ReturnCode = 0,
                 Parameters = new()
                 {
-                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, (byte)GameManager.GetGame(GameId).PlayerCount },
+                    { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, (int)GameManager.GetGame(GameId).PlayerCount },
                     { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, GameManager.GetHashtableFromGame(GameId)},
-                    { (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
+                    //{ (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
                     { (byte)ParameterCodesEnum.Actors_Common, new int[] { 1 } }, // TODO This!
-                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, (byte)GameManager.GetGame(GameId).RoomFlags },
+                    { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, (int)GameManager.GetGame(GameId).RoomFlags },
                     // Repo sending 200 and 201. This is Plugin info related stuff. Dont need to add it.
                 }
             };
         }
         Log.Information("Sending player to join address!");
-        // Add event!
-        var evenCode = new EventData()
+        optional = new(new()
         {
-            Code = opReq.OperationCode,
-            Parameters =
+            eventData = new()
+            {
+                Code = opReq.OperationCode,
+                Parameters =
                 {
                     { 229, 1  }, // PlayersInRoomsCount | FAKE!
                     { 228, 1  }, // RoomsCount | FAKE!
                     { 227, 1  }, // PlayersOnMasterCount | FAKE!
                 }
-        };
-        optional = new();
-        optional.eventData = evenCode;
-        optional.MessageType = RtsMessageType.Event;
+            },
+            MessageType = RtsMessageType.Event,
+        },
+        CommandType.SendUnreliable);
         return new()
         {
             OperationCode = opReq.OperationCode,

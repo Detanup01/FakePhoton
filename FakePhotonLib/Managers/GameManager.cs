@@ -69,11 +69,13 @@ public static class GameManager
         // 232 = CheckUserOnJoin (bool)
 
         game.ExpectedUserIds.Add(peer.UserId == null ? peer.Challenge.ToString() : peer.UserId);
+        Log.Information("ChangeGame!!!");
     }
 
     public static void JoinGamePeer(string id, ClientPeer peer)
     {
         GetGame(id).Peers.Add(peer);
+        /*
         foreach (var item in GetGame(id).Peers)
         {
             Header header = new()
@@ -91,6 +93,7 @@ public static class GameManager
                 ReliableSequenceNumber = 1,
             });
         }
+        */
     }
 
     public static void LeaveGamePeer(string id, ClientPeer peer)
@@ -107,7 +110,7 @@ public static class GameManager
     public static GameData GetGame(string id)
     {
         int idx = Games.FindIndex(x => x.Id == id);
-        if (idx != -1)
+        if (idx == -1)
             return new()
             {
                 Id = id,
