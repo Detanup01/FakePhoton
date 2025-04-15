@@ -2,6 +2,7 @@
 using FakePhotonLib.Datas;
 using FakePhotonLib.Servers;
 using Serilog;
+using System.Collections;
 
 namespace FakePhotonLib.Managers;
 
@@ -26,7 +27,10 @@ public static class OperationRequestManager
         {
             return JoinGame(peer, opReq, out optional);
         }
-
+        if (opReq.OperationCode == (byte)OperationCodeEnum.SetProperties)
+        {
+            return SetProperties(peer, opReq, out optional);
+        }
         Console.WriteLine("Request not found: " + opReq.OperationCode);
         return null;
     }
@@ -296,6 +300,51 @@ public static class OperationRequestManager
                 { (byte)ParameterCodesEnum.Address_JoinGameResponse, "127.0.0.1:5000" },
                 { (byte)ParameterCodesEnum.AuthenticationToken_JoinGameResponse, $"TokenForGameId_{GameId}_{GameManager.GetGameCount()}" }
             }
+        };
+    }
+
+    internal static OperationResponse SetProperties(ClientPeer peer, OperationRequest opReq, out (MessageAndCallback, CommandType)? optional)
+    {
+        optional = null;
+        var game = GameManager.GetGame(peer);
+        ArgumentNullException.ThrowIfNull(game);
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Broadcast_Common, out object? val))
+            game.Broadcast = (bool)val!;
+        int gameProp = 0;
+        if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Properties_Common, out object? prop))
+        {
+            Hashtable hashtable = (Hashtable)prop!;
+            foreach (var item in hashtable.Keys)
+            {
+                if (item == null)
+                    continue;
+                var h_val = hashtable[item];
+                if (h_val == null)
+                    continue;
+                game.Properties.Add(item, h_val);
+            }
+            gameProp = 0;
+        }
+        // event 253!
+        optional = new(new()
+        {
+            eventData = new()
+            {
+                Code = 253,
+                Parameters =
+                {
+                    { 229, 1  }, // PlayersInRoomsCount | FAKE!
+                    { 228, 1  }, // RoomsCount | FAKE!
+                    { 254, 1  }, // PlayersOnMasterCount | FAKE!
+                }
+            },
+            MessageType = RtsMessageType.Event,
+        },
+        CommandType.SendUnreliable);
+        return new()
+        {
+            OperationCode = opReq.OperationCode,
+            ReturnCode = 0,
         };
     }
 }

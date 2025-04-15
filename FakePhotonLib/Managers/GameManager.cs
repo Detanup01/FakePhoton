@@ -118,4 +118,12 @@ public static class GameManager
             };
         return Games[idx];
     }
+
+    public static GameData? GetGame(ClientPeer peer)
+    {
+        int idx = Games.FindIndex(x => x.ExpectedUserIds.Contains(peer.UserId == null ? peer.Challenge.ToString() : peer.UserId));
+        if (idx == -1)
+            return null;
+        return Games[idx];
+    }
 }

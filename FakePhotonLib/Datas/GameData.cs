@@ -4,6 +4,11 @@ using System.Collections;
 
 namespace FakePhotonLib.BinaryData;
 
+/*
+ TODO: Make thing to get the Id of the peer
+ Make custom class for ActorProperties, would be good idea.
+ Search how the UserIds things work.
+ */
 public class GameData
 {
     public string Id { get; set; } = string.Empty;
@@ -23,6 +28,7 @@ public class GameData
     public List<ClientPeer> Peers { get; set; } = [];
     public byte RoomFlags { get; set; }
     public List<string> GameProperties { get; set; } = new();
+    public bool Broadcast { get; set; }
 
     public Hashtable ToHashTable()
     {

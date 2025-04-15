@@ -75,4 +75,6 @@ public enum ParameterCodesEnum
     GameProperties_JoinGameResponse = 248,
     ActorProperties_Common = 249,
     Actors_Common = 252,
+    Broadcast_Common = 250,
+    Properties_Common = 251,
 }
