@@ -124,7 +124,36 @@ public static class GameManager
         }
     }
 
-
+    public static void PushEventExceptPeer(string id, EventData eventData, ClientPeer peer)
+    {
+        var game = GetGame(id);
+        foreach (var item in game.Peers.Where(x=> x != peer))
+        {
+            Header header = new()
+            {
+                CrcOrEncrypted = 0,
+                PeerId = 0,
+                Commands = [],
+                ServerTime = Environment.TickCount,
+                Challenge = item.Challenge,
+            };
+            header.Commands.Add(new()
+            {
+                commandType = CommandType.SendReliable,
+                ReliableSequenceNumber = item.LastReliableSequence[item.GetLastConnection()!.Server.Id] + 1,
+                Size = 12,
+                ChannelID = 0,
+                CommandFlags = 1,
+                messageAndCallback = new()
+                {
+                    eventData = eventData,
+                    MessageType = RtsMessageType.Event,
+                },
+                ReservedByte = 0,
+            });
+            PacketManager.Send(item, item.GetLastConnection(), header);
+        }
+    }
 
 
 

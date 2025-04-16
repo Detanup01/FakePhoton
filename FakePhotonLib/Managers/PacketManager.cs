@@ -65,12 +65,12 @@ public class PacketManager
 
         peer.LastConnectionIndex = peer.Connections.FindIndex(x=>x.Server.Id == clientConnection.Server.Id);
 
-        //Log.Information("{UniqueName} Received: {Header}", clientConnection.Server.Id, header.ToString());
+        Log.Information("{UniqueName} Received: {Header}", clientConnection.Server.Id, header.ToString());
         for (int i = 0; i < header.CommandCount; i++)
         {
             CommandPacket packet = new();
             packet.Read(binaryReader);
-            //Log.Information("{UniqueName} Received: {Packet}", clientConnection.Server.Id, packet.ToString());
+            Log.Information("{UniqueName} Received: {Packet}", clientConnection.Server.Id, packet.ToString());
 
             if (packet.Payload != null)
             {
@@ -127,6 +127,8 @@ public class PacketManager
                 //Log.Information("Replying with messageAndCallback!");
                 peer.LastReliableSequence[clientToSendTo.Server.Id] = command.ReliableSequenceNumber;
                 var new_callback = MessageManager.Parse(peer, command.messageAndCallback, out (MessageAndCallback, CommandType)? optional);
+                if (new_callback.MessageType == RtsMessageType.Unknown)
+                    continue;
                 header.Commands.Add(new CommandPacket()
                 {
                     commandType = CommandType.SendReliable,

@@ -33,7 +33,8 @@ public static class OperationRequestManager
         }
         if (opReq.OperationCode == (byte)OperationCodeEnum.RaiseEvent)
         {
-            return RaiseEvent(peer, opReq);
+            RaiseEvent(peer, opReq);
+            return null;
         }
         Console.WriteLine("Request not found: " + opReq.OperationCode);
         return null;
@@ -308,7 +309,9 @@ public static class OperationRequestManager
                 var h_val = hashTable[item];
                 if (h_val == null)
                     continue;
-                game.Properties.Add(item, h_val);
+                if (!game.Properties.ContainsKey(item))
+                    game.Properties.Add(item, h_val);
+                game.Properties[item] = h_val;
             }
             gameProp = 0;
             code = (byte)ParameterCodesEnum.Properties_Common;
@@ -330,19 +333,48 @@ public static class OperationRequestManager
             ReturnCode = 0,
         };
     }
-    internal static OperationResponse RaiseEvent(ClientPeer peer, OperationRequest opReq)
+    internal static void RaiseEvent(ClientPeer peer, OperationRequest opReq)
     {
         var game = GameManager.GetGame(peer);
         ArgumentNullException.ThrowIfNull(game);
         foreach (var item in opReq.Parameters)
         {
-            Log.Information("RaiseEvent: {Key} = {Value}", item.Key, item.Value);
+            Log.Information("RaiseEvent: {Key} = {Value} {ValueType}", item.Key, item.Value, item.Value!.GetType());
+            if (item.Value != null && item.Value.GetType() == typeof(Hashtable))
+            {
+                var hashTable = (Hashtable)item.Value;
+                foreach (var table in hashTable.Values)
+                {
+                    if (table.GetType() == typeof(int[]))
+                    {
+                        var int_array = (int[])table;
+                        Log.Information("RaiseEvent Hashtable: int[] {Val}", int_array);
+                    }
+                    if (table.GetType() == typeof(object[]))
+                    {
+                        var array = (object[])table;
+                        Log.Information("RaiseEvent Hashtable: object[] {Val}", array);
+                        foreach (var arrItem in array)
+                        {
+                            Log.Information("RaiseEvent Hashtable: object arrItem {Val}", arrItem);
+                        }
+                    }
+                }
+            }
         }
-
-        return new()
+        var code = (byte)opReq.Parameters[244]!;
+        Hashtable hashtable = (Hashtable)opReq.Parameters[245]!;
+        if (hashtable.ContainsKey((byte)6))
         {
-            OperationCode = opReq.OperationCode,
-            ReturnCode = 0,
-        };
+            hashtable[(byte)6] = Environment.TickCount;
+        }
+        GameManager.PushEventExceptPeer(game.Id, new()
+        {
+            Code = code,
+            Parameters =
+            {
+                { 245, hashtable  },
+            }
+        }, peer);
     }
 }

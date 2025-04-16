@@ -19,8 +19,9 @@ public static class MessageManager
         if (input.operationRequest != null)
         {
             ReturnMessage.Reset();
-            ReturnMessage.MessageType = input.MessageType == RtsMessageType.InternalOperationRequest ? RtsMessageType.InternalOperationResponse : RtsMessageType.OperationResponse;
             ReturnMessage.operationResponse = OperationRequestManager.Parse(peer, input.operationRequest, out optional);
+            if (ReturnMessage.operationResponse != null)
+                ReturnMessage.MessageType = input.MessageType == RtsMessageType.InternalOperationRequest ? RtsMessageType.InternalOperationResponse : RtsMessageType.OperationResponse;
         }
         if (input.IsInit != null)
         {

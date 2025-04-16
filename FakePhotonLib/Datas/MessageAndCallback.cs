@@ -155,7 +155,7 @@ public class MessageAndCallback : ICloneable
 
     public void Reset()
     {
-        MessageType = RtsMessageType.Init;
+        MessageType = RtsMessageType.Unknown;
         operationResponse = null;
         operationRequest = null;
         eventData = null;
