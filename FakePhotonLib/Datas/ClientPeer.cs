@@ -8,7 +8,8 @@ public class ClientPeer
     public short PeerId;
     public int Challenge;
     public string? UserId;
-    public Dictionary<UdpServer, int> LastUnreliableSequence = [];
+    public Dictionary<Guid, int> LastUnreliableSequence = [];
+    public Dictionary<Guid, int> LastReliableSequence = [];
 
     public List<ClientConnection> Connections = [];
 
@@ -32,6 +33,11 @@ public class ClientPeer
         {
             Server = server;
             EndPoint = endPoint;
+        }
+
+        public override string ToString()
+        {
+            return $"Server: {Server} EndPoint: {EndPoint}";
         }
     }
 }

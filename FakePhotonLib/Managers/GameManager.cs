@@ -1,5 +1,6 @@
 ﻿using FakePhotonLib.BinaryData;
 using FakePhotonLib.Datas;
+using ModdableWebServer;
 using Serilog;
 using System.Collections;
 
@@ -31,7 +32,10 @@ public static class GameManager
             Hashtable table = (Hashtable)props[(byte)ParameterCodesEnum.ActorProperties_Common]!;
             if (table.ContainsKey((byte)255))
             {
-                game.ActorsProperties.Nicknames.Add((string)table[(byte)255]!);
+                game.ActorsProperties.Add(new()
+                {
+                  PlayerName = (string)table[(byte)255]!
+                });
             }
         }
         if (props.ContainsKey((byte)ParameterCodesEnum.GameProperties_JoinGameRequest))
@@ -74,9 +78,25 @@ public static class GameManager
 
     public static void JoinGamePeer(string id, ClientPeer peer)
     {
-        GetGame(id).Peers.Add(peer);
-        /*
-        foreach (var item in GetGame(id).Peers)
+        var game = GetGame(id);
+        game.Peers.Add(peer);
+        PushEvent(id, new()
+        {
+            Code = 255,
+            Parameters =
+            {
+                { 249, game.GetActorProperties() }, // Actor Properties
+                { 252, game.GetPeers() }, // Client numbes
+                { 254, game.GetPeerNumber(peer) }, // Sender.
+            }
+        });
+    }
+
+
+    public static void PushEvent(string id, EventData eventData)
+    {
+        var game = GetGame(id);
+        foreach (var item in game.Peers)
         {
             Header header = new()
             {
@@ -87,14 +107,26 @@ public static class GameManager
                 Challenge = item.Challenge,
             };
             header.Commands.Add(new()
-            { 
+            {
                 commandType = CommandType.SendReliable,
-                ChannelID = 255,
-                ReliableSequenceNumber = 1,
+                ReliableSequenceNumber = item.LastReliableSequence[item.GetLastConnection()!.Server.Id] + 1,
+                Size = 12,
+                ChannelID = 0,
+                CommandFlags = 1,
+                messageAndCallback = new()
+                {
+                    eventData = eventData,
+                    MessageType = RtsMessageType.Event,
+                },
+                ReservedByte = 0,
             });
+            PacketManager.Send(item, item.GetLastConnection(), header);
         }
-        */
     }
+
+
+
+
 
     public static void LeaveGamePeer(string id, ClientPeer peer)
     {

@@ -24,7 +24,7 @@ public class GameData
     public List<ExcludedUser> ExcludedUsers { get; set; } = [];
     public byte PlayerCount => (byte)(ActiveUserIds.Count + ExpectedUserIds.Count + InactiveUserIds.Count);
     public string? Password { get; set; } = null;
-    public ActorsProperties ActorsProperties { get; set; } = new();
+    public List<ActorsProperty> ActorsProperties { get; set; } = [];
     public List<ClientPeer> Peers { get; set; } = [];
     public byte RoomFlags { get; set; }
     public List<string> GameProperties { get; set; } = new();
@@ -57,27 +57,45 @@ public class GameData
         h[GameParameters.PlayerTTL] = 0;
         h[GameParameters.EmptyRoomTTL] = 0;
         h[GameParameters.ExpectedMaxPlayers] = (int)ExpectedMaxPlayer;
-        //h["PASSWORD"] = null;
         h[GameParameters.MaxPlayers] = MaxPlayer;
         h[GameParameters.IsVisible] = IsVisible;
         h[GameParameters.IsOpen] = IsOpen;
-
-        // PASSWORD
-        // curScn
         return h;
     }
 
-    public Hashtable GetUserHashTable()
+    public Hashtable GetActorProperties()
     {
         Hashtable h = new();
-        for (int i = 0; i < ActorsProperties.Nicknames.Count; i++)
+        for (int i = 0; i < ActorsProperties.Count; i++)
         {
             h[(byte)i+1] = new Hashtable()
             {
-                { 255, ActorsProperties.Nicknames[i] } 
+                { 255, ActorsProperties[i].PlayerName } 
             };
+            if (((RoomFlag)RoomFlags).HasFlag(RoomFlag.PublishUserId))
+            {
+                ((Hashtable)h[(byte)i + 1]!).Add(253, ActorsProperties[i].UserId);
+            }
         }
         return h;
+    }
+
+    public int[] GetPeers()
+    {
+        List<int> peer = [];
+        for (int i = 0; i < Peers.Count; i++)
+        {
+            peer.Add(i+1);
+        }
+        return peer.ToArray();
+    }
+
+    public int GetPeerNumber(ClientPeer peer)
+    {
+        var indx = Peers.FindIndex(0, x => x.Challenge == peer.Challenge);
+        if (indx == -1)
+            return -1;
+        return indx + 1;
     }
 }
 
@@ -88,9 +106,11 @@ public class ExcludedUser
     public byte Reason { get; set; }
 }
 
-public class ActorsProperties
+public class ActorsProperty
 {
-    public List<string> Nicknames { get; set; } = [];
+    public string PlayerName { get; set; } = string.Empty; // 255
+    public bool IsInactive { get; set; } = false; // 254
+    public string UserId { get; set; } = string.Empty; // 253 | Sent when room gets created with RoomOptions.PublishUserId = true.
 }
 public static class GameParameters
 {

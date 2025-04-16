@@ -28,7 +28,7 @@ public static class MessageManager
             ReturnMessage.MessageType = RtsMessageType.InitResponse;
 
         }
-        Log.Information(ReturnMessage.ToString());
+        //Log.Information(ReturnMessage.ToString());
         return ReturnMessage;
     }
 }

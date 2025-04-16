@@ -29,7 +29,11 @@ public static class OperationRequestManager
         }
         if (opReq.OperationCode == (byte)OperationCodeEnum.SetProperties)
         {
-            return SetProperties(peer, opReq, out optional);
+            return SetProperties(peer, opReq);
+        }
+        if (opReq.OperationCode == (byte)OperationCodeEnum.RaiseEvent)
+        {
+            return RaiseEvent(peer, opReq);
         }
         Console.WriteLine("Request not found: " + opReq.OperationCode);
         return null;
@@ -241,25 +245,7 @@ public static class OperationRequestManager
 
         if (IsGameExisted)
         {
-            // send event 255
-            optional = new(new()
-            {
-                eventData = new()
-                {
-                    Code = 255,
-                    Parameters =
-                    {
-                        { 249, opReq.Parameters[249]  },
-                        { 252, new int[] { 1 }  },
-                        { 254, (int)GameManager.GetGame(GameId).PlayerCount  },
-                    }
-                },
-                MessageType = RtsMessageType.Event,
-            },CommandType.SendReliable);
-            Log.Information("ActorNr: {number}", GameManager.GetGame(GameId).PlayerCount);
-            Log.Information("GameProperties: {number}", GameManager.GetHashtableFromGame(GameId));
-            Log.Information("ActorProperties: {number}", GameManager.GetGame(GameId).GetUserHashTable());
-            Log.Information("RoomFlags: {number}", GameManager.GetGame(GameId).RoomFlags);
+            GameManager.JoinGamePeer(GameId, peer);
             return new()
             {
                 OperationCode = opReq.OperationCode,
@@ -269,7 +255,7 @@ public static class OperationRequestManager
                     { (byte)ParameterCodesEnum.ActorNr_JoinGameRequest, (int)GameManager.GetGame(GameId).PlayerCount },
                     { (byte)ParameterCodesEnum.GameProperties_JoinGameResponse, GameManager.GetHashtableFromGame(GameId)},
                     //{ (byte)ParameterCodesEnum.ActorProperties_Common, GameManager.GetGame(GameId).GetUserHashTable() },
-                    { (byte)ParameterCodesEnum.Actors_Common, new int[] { 1 } }, // TODO This!
+                    { (byte)ParameterCodesEnum.Actors_Common, GameManager.GetGame(GameId).GetPeers() },
                     { (byte)ParameterCodesEnum.RoomFlags_JoinGameResponse, (int)GameManager.GetGame(GameId).RoomFlags },
                     // Repo sending 200 and 201. This is Plugin info related stuff. Dont need to add it.
                 }
@@ -303,44 +289,56 @@ public static class OperationRequestManager
         };
     }
 
-    internal static OperationResponse SetProperties(ClientPeer peer, OperationRequest opReq, out (MessageAndCallback, CommandType)? optional)
+    internal static OperationResponse SetProperties(ClientPeer peer, OperationRequest opReq)
     {
-        optional = null;
         var game = GameManager.GetGame(peer);
         ArgumentNullException.ThrowIfNull(game);
         if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Broadcast_Common, out object? val))
             game.Broadcast = (bool)val!;
         int gameProp = 0;
+        Hashtable hashTable = new();
+        byte code = 0;
         if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Properties_Common, out object? prop))
         {
-            Hashtable hashtable = (Hashtable)prop!;
-            foreach (var item in hashtable.Keys)
+            hashTable = (Hashtable)prop!;
+            foreach (var item in hashTable.Keys)
             {
                 if (item == null)
                     continue;
-                var h_val = hashtable[item];
+                var h_val = hashTable[item];
                 if (h_val == null)
                     continue;
                 game.Properties.Add(item, h_val);
             }
             gameProp = 0;
+            code = (byte)ParameterCodesEnum.Properties_Common;
         }
-        // event 253!
-        optional = new(new()
+        GameManager.PushEvent(game.Id, new()
         {
-            eventData = new()
+            Code = 253,
+            Parameters =
             {
-                Code = 253,
-                Parameters =
-                {
-                    { 229, 1  }, // PlayersInRoomsCount | FAKE!
-                    { 228, 1  }, // RoomsCount | FAKE!
-                    { 254, 1  }, // PlayersOnMasterCount | FAKE!
-                }
-            },
-            MessageType = RtsMessageType.Event,
-        },
-        CommandType.SendUnreliable);
+                { 253, gameProp  },
+                { code, hashTable  },
+                { 254, game.GetPeerNumber(peer)  },
+            }
+        });
+
+        return new()
+        {
+            OperationCode = opReq.OperationCode,
+            ReturnCode = 0,
+        };
+    }
+    internal static OperationResponse RaiseEvent(ClientPeer peer, OperationRequest opReq)
+    {
+        var game = GameManager.GetGame(peer);
+        ArgumentNullException.ThrowIfNull(game);
+        foreach (var item in opReq.Parameters)
+        {
+            Log.Information("RaiseEvent: {Key} = {Value}", item.Key, item.Value);
+        }
+
         return new()
         {
             OperationCode = opReq.OperationCode,

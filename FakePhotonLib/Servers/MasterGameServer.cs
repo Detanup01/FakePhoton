@@ -22,7 +22,7 @@ public class MasterGameServer(IPAddress address, int port) : UdpServer(address, 
     protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
-        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", nameof(MasterGameServer), endpoint, Convert.ToHexString(buf));
+        Log.Information("Received on {UniqueName} {Id} from {EndPoint}", nameof(MasterGameServer), Id, endpoint);
         if (buf.Length == 0)
         {
             PacketManager.DisconnectClient(new(this, endpoint));
@@ -31,6 +31,7 @@ public class MasterGameServer(IPAddress address, int port) : UdpServer(address, 
         }
         if (buf.Length >= 12 && Convert.ToHexString(buf[..12]) == "7D7D7D7D7D7D7D7D7D7D7D7D")
         {
+            Log.Information("PING!");
             Send(endpoint, buf);
             ReceiveAsync();
             return;

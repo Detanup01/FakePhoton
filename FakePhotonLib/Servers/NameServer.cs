@@ -21,7 +21,7 @@ public class NameServer(IPAddress address, int port) : UdpServer(address, port)
     protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
-        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", nameof(NameServer), endpoint, Convert.ToHexString(buf));
+        Log.Information("Received on {UniqueName} {Id} from {EndPoint}", nameof(NameServer), Id, endpoint);
         if (buf.Length == 0)
         {
             PacketManager.DisconnectClient(new(this, endpoint));

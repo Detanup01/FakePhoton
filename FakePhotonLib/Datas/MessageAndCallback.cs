@@ -94,7 +94,6 @@ public class MessageAndCallback : ICloneable
 
     public void Write(BinaryWriter writer)
     {
-        Log.Information("M A C Writer!");
         writer.Write((byte)243);
         var msg_type = (byte)MessageType;
         if (IsEncrypted)
@@ -116,24 +115,20 @@ public class MessageAndCallback : ICloneable
             Protocol.ProtocolDefault.SerializeEventData(dataWriter, eventData, false);
         if (disconnectMessage != null)
             Protocol.ProtocolDefault.SerializeMessage(dataWriter, disconnectMessage);
-        Log.Information("Testing packet deser");
         byte[] data = ms.ToArray();
         try
         {
             if (operationResponse != null)
             {
                 var rsp = Protocol.ProtocolDefault.DeserializeOperationResponse(new(new MemoryStream(data)));
-                Log.Information("{Rsp}", rsp);
             }
             if (operationRequest != null)
             {
                 var rsp = Protocol.ProtocolDefault.DeserializeOperationRequest(new(new MemoryStream(data)));
-                Log.Information("{Rsp}", rsp);
             }
             if (eventData != null)
             {
                 var rsp = Protocol.ProtocolDefault.DeserializeEventData(new(new MemoryStream(data)));
-                Log.Information("{Rsp}", rsp);
             }
         }
         catch (Exception ex)

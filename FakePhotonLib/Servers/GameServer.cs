@@ -23,7 +23,7 @@ public class GameServer(string serverType, IPAddress address, int port) : UdpSer
     protected override void OnReceived(EndPoint endpoint, byte[] buffer, long offset, long size)
     {
         var buf = buffer.Skip((int)offset).Take((int)size).ToArray();
-        Log.Information("Received on {UniqueName} from {EndPoint}\n{Bytes}", (nameof(GameServer) + ServerType), endpoint, Convert.ToHexString(buf));
+        Log.Information("Received on {UniqueName} {Id} from {EndPoint}", (nameof(GameServer) + "_" + ServerType), Id, endpoint); //, Convert.ToHexString(buf));
         if (buf.Length == 0)
         {
             PacketManager.DisconnectClient(new(this, endpoint));

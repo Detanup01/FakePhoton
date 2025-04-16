@@ -2,8 +2,6 @@
 using FakePhotonLib.Datas;
 using NetCoreServer;
 using Serilog;
-using System.Net;
-using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 
 namespace FakePhotonLib.Managers;
@@ -16,6 +14,7 @@ public class PacketManager
 
     public static void DisconnectClient(ClientPeer.ClientConnection clientConnection)
     {
+        Log.Information("!!!! DisconnectClient");
         var peerIndex = Peers.FindIndex(x => x.Connections.Contains(clientConnection));
         if (peerIndex == -1)
             return;
@@ -42,7 +41,11 @@ public class PacketManager
                 Challenge = header.Challenge,
                 LastUnreliableSequence =
                 {
-                    { clientConnection.Server, 0 }
+                    { clientConnection.Server.Id, 0 }
+                },
+                LastReliableSequence =
+                { 
+                    { clientConnection.Server.Id, 0 }
                 },
                 Connections =
                 {
@@ -51,19 +54,23 @@ public class PacketManager
             };
             Peers.Add(peer);
         }
-        if (!peer.LastUnreliableSequence.ContainsKey(clientConnection.Server))
-            peer.LastUnreliableSequence.Add(clientConnection.Server, 0);
-        if (!peer.Connections.Contains(clientConnection))
+
+        if (!peer.LastUnreliableSequence.ContainsKey(clientConnection.Server.Id))
+            peer.LastUnreliableSequence.Add(clientConnection.Server.Id, 0);
+        if (!peer.LastReliableSequence.ContainsKey(clientConnection.Server.Id))
+            peer.LastReliableSequence.Add(clientConnection.Server.Id, 0);
+
+        if (!peer.Connections.Exists(x => x.Server.Id == clientConnection.Server.Id))
             peer.Connections.Add(clientConnection);
 
-        peer.LastConnectionIndex = peer.Connections.FindIndex(x=>x == clientConnection);
+        peer.LastConnectionIndex = peer.Connections.FindIndex(x=>x.Server.Id == clientConnection.Server.Id);
 
-        Log.Information("{UniqueName} Received: {Header}", clientConnection.Server.Id, header.ToString());
+        //Log.Information("{UniqueName} Received: {Header}", clientConnection.Server.Id, header.ToString());
         for (int i = 0; i < header.CommandCount; i++)
         {
             CommandPacket packet = new();
             packet.Read(binaryReader);
-            Log.Information("{UniqueName} Received: {Packet}", clientConnection.Server.Id, packet.ToString());
+            //Log.Information("{UniqueName} Received: {Packet}", clientConnection.Server.Id, packet.ToString());
 
             if (packet.Payload != null)
             {
@@ -73,7 +80,7 @@ public class PacketManager
                 {
                     using BinaryReader payload_reader = new(new MemoryStream(packet.Payload));
                     packet.messageAndCallback.Read(payload_reader);
-                    Log.Information("{UniqueName} Received: {MC}", clientConnection.Server.Id, packet.messageAndCallback.ToString());
+                    //Log.Information("{UniqueName} Received: {MC}", clientConnection.Server.Id, packet.messageAndCallback.ToString());
                 }
                 catch (Exception ex)
                 {
@@ -98,10 +105,10 @@ public class PacketManager
 
         foreach (var command in header_from.Commands)
         {
-            Log.Information("Working on: {CommandType}", command.commandType);
+            //Log.Information("Working on: {CommandType}", command.commandType);
             if (command.IsFlaggedReliable && command.commandType != CommandType.Ack)
             {
-                Log.Information("Replying with Ack!");
+                //Log.Information("Replying with Ack!");
                 header.Commands.Add(new CommandPacket()
                 {
                     commandType = command.IsFlaggedUnsequenced ? CommandType.AckUnsequenced : CommandType.Ack,
@@ -117,7 +124,8 @@ public class PacketManager
             {
                 if (DoNotProcessReliablePacketIds.TryGetValue(header.Challenge, out var rsn) && rsn.Contains(command.ReliableSequenceNumber))
                     continue;
-                Log.Information("Replying with messageAndCallback!");
+                //Log.Information("Replying with messageAndCallback!");
+                peer.LastReliableSequence[clientToSendTo.Server.Id] = command.ReliableSequenceNumber;
                 var new_callback = MessageManager.Parse(peer, command.messageAndCallback, out (MessageAndCallback, CommandType)? optional);
                 header.Commands.Add(new CommandPacket()
                 {
@@ -136,7 +144,7 @@ public class PacketManager
                     {
                         commandType = optional.Value.Item2,
                         ReliableSequenceNumber = command.ReliableSequenceNumber + 1,
-                        UnreliableSequenceNumber = optional.Value.Item2 == CommandType.SendUnreliable ? peer.LastUnreliableSequence[clientToSendTo.Server!]++ : 0,
+                        UnreliableSequenceNumber = optional.Value.Item2 == CommandType.SendUnreliable ? peer.LastUnreliableSequence[clientToSendTo.Server.Id!]++ : 0,
                         Size = optional.Value.Item2 == CommandType.SendUnreliable ? 16 : 12,
                         ChannelID = command.ChannelID,
                         CommandFlags = (byte)(optional.Value.Item2 == CommandType.SendUnreliable ? 0 : 1),
@@ -152,7 +160,7 @@ public class PacketManager
             }
             if (command.commandType == CommandType.Connect)
             {
-                Log.Information("Replying with VerifyConnect!");
+                //Log.Information("Replying with VerifyConnect!");
                 var peerID = (short)RandomNumberGenerator.GetInt32(short.MaxValue);
                 peer.PeerId = peerID;
                 header.Commands.Add(new CommandPacket()
@@ -180,8 +188,13 @@ public class PacketManager
         Send(peer, clientToSendTo, header);
     }
 
-    public static void Send(ClientPeer peer, ClientPeer.ClientConnection clientToSendTo, Header header)
+    public static void Send(ClientPeer peer, ClientPeer.ClientConnection? clientToSendTo, Header header)
     {
+        if (clientToSendTo == null)
+        {
+            Log.Error("Peer does not have associated server!");
+            return;
+        }
         if (clientToSendTo.Server == null)
         {
             Log.Error("Peer does not have associated server!");
@@ -210,7 +223,7 @@ public class PacketManager
                 writer.Flush();
                 commandPacket.Size += (int)writer.BaseStream.Length;
                 commandPacket.Payload = ms.ToArray();
-                Log.Information("Command payload is now: {payload}", Convert.ToHexString(commandPacket.Payload));
+                //Log.Information("Command payload is now: {payload}", Convert.ToHexString(commandPacket.Payload));
                 ms.SetLength(0);
             }
             commandPacket.Write(out_writer);
@@ -219,9 +232,9 @@ public class PacketManager
 
         var packet = out_BigStream.ToArray();
 
-        Log.Information("Sending out packet {packet} {packetLen} to {address}", Convert.ToHexString(packet), packet.Length, clientToSendTo.EndPoint);
+        //Log.Information("Sending out packet {packet} {packetLen} to {address}", Convert.ToHexString(packet), packet.Length, clientToSendTo.EndPoint);
 
         var sentBytes = clientToSendTo.Server.Send(clientToSendTo.EndPoint, packet);
-        Log.Information("Sent bytes: {sent}", sentBytes);
+        //Log.Information("Sent bytes: {sent}", sentBytes);
     }
 }
