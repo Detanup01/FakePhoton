@@ -1,5 +1,4 @@
-﻿using Serilog;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 
 namespace FakePhotonLib.BinaryData;
 
@@ -52,7 +51,7 @@ public class CommandPacket
                 break;
             case CommandType.SendUnreliable:
                 UnreliableSequenceNumber = reader.ReadInt32Big();
-                ShouldSetPayload = Size - 17;
+                ShouldSetPayload = Size - 16;
                 break;
             case CommandType.SendFragment:
             case CommandType.SendFragmentUnsequenced:
@@ -141,6 +140,10 @@ public class CommandPacket
         if (commandType == CommandType.Ack)
         {
             ack_str = $"ARSN: {AckReceivedReliableSequenceNumber} ARST: {AckReceivedSentTime:x2}";
+        }
+        if (commandType == CommandType.SendFragment || commandType == CommandType.SendFragmentUnsequenced)
+        {
+            ack_str = $"SQN: {StartSequenceNumber} FC: {FragmentCount} FN: {FragmentNumber} FO: {FragmentOffset} TL {TotalLength}";
         }
         return $"Type: {commandType} ChannelId: {ChannelID} Flag: {CommandFlags} Reserved: {ReservedByte} Size: {Size} RSN: {ReliableSequenceNumber} {ack_str} {payload_size}";
     }

@@ -12,9 +12,10 @@ public class PacketManager
 
     public static Dictionary<int, List<int>> DoNotProcessReliablePacketIds = [];
 
+    public static Dictionary<int, List<CommandPacket>> FragmentPackets = [];
+
     public static void DisconnectClient(ClientPeer.ClientConnection clientConnection)
     {
-        Log.Information("!!!! DisconnectClient");
         var peerIndex = Peers.FindIndex(x => x.Connections.Contains(clientConnection));
         if (peerIndex == -1)
             return;
@@ -72,6 +73,36 @@ public class PacketManager
             packet.Read(binaryReader);
             Log.Information("{UniqueName} Received: {Packet}", clientConnection.Server.Id, packet.ToString());
 
+            if (packet.commandType == CommandType.SendFragment || packet.commandType == CommandType.SendFragmentUnsequenced)
+            {
+                int id = packet.StartSequenceNumber + packet.FragmentNumber - 1;
+                if (!FragmentPackets.ContainsKey(id))
+                    FragmentPackets.Add(id, []);
+                FragmentPackets[id].Add(packet);
+                if (packet.FragmentNumber != id)
+                    continue;
+                var packets = FragmentPackets[id];
+                packets = packets.OrderBy(x=>x.FragmentOffset).ToList();
+                var firstPacket = packets[0];
+                var tmpBigPacket = new CommandPacket()
+                {
+                    Size = firstPacket.TotalLength,
+                    ChannelID = firstPacket.ChannelID,
+                    commandType = firstPacket.commandType,
+                    ReservedByte = firstPacket.ReservedByte,
+                    CommandFlags = firstPacket.CommandFlags,
+                    ReliableSequenceNumber = firstPacket.ReliableSequenceNumber,
+                    Payload = [],
+                };
+                List<byte> Bytes = new(firstPacket.TotalLength);
+                foreach (var item in packets)
+                {
+                    Bytes.AddRange(item.Payload!);
+                }
+                tmpBigPacket.Payload = Bytes.ToArray();
+                header.Commands.Add(tmpBigPacket);
+                continue;
+            }
             if (packet.Payload != null)
             {
                 packet.messageAndCallback = new();
@@ -117,6 +148,17 @@ public class PacketManager
                     Size = 20,
                     ReliableSequenceNumber = 0,
                     ReservedByte = 0,
+                    ChannelID = command.ChannelID,
+                });
+            }
+            if (command.commandType == CommandType.Ping)
+            {
+                header.Commands.Add(new CommandPacket()
+                {
+                    commandType = CommandType.Ping,
+                    Size = 20,
+                    ReliableSequenceNumber = command.ReliableSequenceNumber,
+                    ReservedByte = 4,
                     ChannelID = command.ChannelID,
                 });
             }
