@@ -296,6 +296,7 @@ public static class OperationRequestManager
         ArgumentNullException.ThrowIfNull(game);
         if (opReq.Parameters.TryGetValue((byte)ParameterCodesEnum.Broadcast_Common, out object? val))
             game.Broadcast = (bool)val!;
+
         int gameProp = 0;
         Hashtable hashTable = new();
         byte code = 0;
@@ -340,41 +341,34 @@ public static class OperationRequestManager
         foreach (var item in opReq.Parameters)
         {
             Log.Information("RaiseEvent: {Key} = {Value} {ValueType}", item.Key, item.Value, item.Value!.GetType());
-            if (item.Value != null && item.Value.GetType() == typeof(Hashtable))
-            {
-                var hashTable = (Hashtable)item.Value;
-                foreach (var table in hashTable.Values)
-                {
-                    if (table.GetType() == typeof(int[]))
-                    {
-                        var int_array = (int[])table;
-                        Log.Information("RaiseEvent Hashtable: int[] {Val}", int_array);
-                    }
-                    if (table.GetType() == typeof(object[]))
-                    {
-                        var array = (object[])table;
-                        Log.Information("RaiseEvent Hashtable: object[] {Val}", array);
-                        foreach (var arrItem in array)
-                        {
-                            Log.Information("RaiseEvent Hashtable: object arrItem {Val}", arrItem);
-                        }
-                    }
-                }
-            }
         }
         var code = (byte)opReq.Parameters[244]!;
-        Hashtable hashtable = (Hashtable)opReq.Parameters[245]!;
-        if (hashtable.ContainsKey((byte)6))
+        object data = opReq.Parameters[245]!;
+        if (code == 200)
         {
-            hashtable[(byte)6] = Environment.TickCount;
+            Hashtable hashtable = (Hashtable)data;
+            if (hashtable.ContainsKey((byte)6))
+            {
+                hashtable[(byte)6] = Environment.TickCount;
+            }
+            data = hashtable;
         }
-        GameManager.PushEventExceptPeer(game.Id, new()
+        byte bReceivedGroup = 0;
+        // ReceivedGroup
+        if (opReq.Parameters.TryGetValue(246, out var ReceivedGroup))
+        {
+            bReceivedGroup = (byte)ReceivedGroup!;
+
+        }
+        var peers = GameManager.GetPeersFromReceiveGroup(game.Id, bReceivedGroup, peer);
+        Log.Information("Peers to send: {peers}", peers);
+        GameManager.PushEventToPeers(game.Id, new()
         {
             Code = code,
             Parameters =
             {
-                { 245, hashtable  },
+                { 245, data  },
             }
-        }, peer);
+        }, peers);
     }
 }

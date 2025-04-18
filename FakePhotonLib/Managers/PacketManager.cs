@@ -75,11 +75,11 @@ public class PacketManager
 
             if (packet.commandType == CommandType.SendFragment || packet.commandType == CommandType.SendFragmentUnsequenced)
             {
-                int id = packet.StartSequenceNumber + packet.FragmentNumber - 1;
+                int id = packet.StartSequenceNumber + packet.FragmentCount - 1;
                 if (!FragmentPackets.ContainsKey(id))
                     FragmentPackets.Add(id, []);
                 FragmentPackets[id].Add(packet);
-                if (packet.FragmentNumber != id)
+                if (packet.ReliableSequenceNumber != id)
                     continue;
                 var packets = FragmentPackets[id];
                 packets = packets.OrderBy(x=>x.FragmentOffset).ToList();
@@ -88,10 +88,10 @@ public class PacketManager
                 {
                     Size = firstPacket.TotalLength,
                     ChannelID = firstPacket.ChannelID,
-                    commandType = firstPacket.commandType,
+                    commandType = CommandType.SendReliable,
                     ReservedByte = firstPacket.ReservedByte,
                     CommandFlags = firstPacket.CommandFlags,
-                    ReliableSequenceNumber = firstPacket.ReliableSequenceNumber,
+                    ReliableSequenceNumber = packet.ReliableSequenceNumber,
                     Payload = [],
                 };
                 List<byte> Bytes = new(firstPacket.TotalLength);
@@ -100,8 +100,7 @@ public class PacketManager
                     Bytes.AddRange(item.Payload!);
                 }
                 tmpBigPacket.Payload = Bytes.ToArray();
-                header.Commands.Add(tmpBigPacket);
-                continue;
+                packet = tmpBigPacket;
             }
             if (packet.Payload != null)
             {
@@ -111,11 +110,11 @@ public class PacketManager
                 {
                     using BinaryReader payload_reader = new(new MemoryStream(packet.Payload));
                     packet.messageAndCallback.Read(payload_reader);
-                    //Log.Information("{UniqueName} Received: {MC}", clientConnection.Server.Id, packet.messageAndCallback.ToString());
+                    Log.Information("{UniqueName} Received: {MC}", clientConnection.Server.Id, packet.messageAndCallback.ToString());
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.ToString());
+                    Log.Error(ex.ToString());
                 }
             }
             header.Commands.Add(packet);

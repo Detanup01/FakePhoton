@@ -91,71 +91,64 @@ public static class GameManager
             }
         });
     }
-
-
     public static void PushEvent(string id, EventData eventData)
     {
         var game = GetGame(id);
-        foreach (var item in game.Peers)
-        {
-            Header header = new()
-            {
-                CrcOrEncrypted = 0,
-                PeerId = 0,
-                Commands = [],
-                ServerTime = Environment.TickCount,
-                Challenge = item.Challenge,
-            };
-            header.Commands.Add(new()
-            {
-                commandType = CommandType.SendReliable,
-                ReliableSequenceNumber = item.LastReliableSequence[item.GetLastConnection()!.Server.Id] + 1,
-                Size = 12,
-                ChannelID = 0,
-                CommandFlags = 1,
-                messageAndCallback = new()
-                {
-                    eventData = eventData,
-                    MessageType = RtsMessageType.Event,
-                },
-                ReservedByte = 0,
-            });
-            PacketManager.Send(item, item.GetLastConnection(), header);
-        }
+        game.Peers.ForEach( peer => PushEventToPeer(id, eventData, peer) );
     }
 
-    public static void PushEventExceptPeer(string id, EventData eventData, ClientPeer peer)
+    public static List<ClientPeer> GetPeersFromReceiveGroup(string id, byte receiveGroup, ClientPeer peer)
     {
         var game = GetGame(id);
-        foreach (var item in game.Peers.Where(x=> x != peer))
+        switch (receiveGroup)
         {
-            Header header = new()
-            {
-                CrcOrEncrypted = 0,
-                PeerId = 0,
-                Commands = [],
-                ServerTime = Environment.TickCount,
-                Challenge = item.Challenge,
-            };
-            header.Commands.Add(new()
-            {
-                commandType = CommandType.SendReliable,
-                ReliableSequenceNumber = item.LastReliableSequence[item.GetLastConnection()!.Server.Id] + 1,
-                Size = 12,
-                ChannelID = 0,
-                CommandFlags = 1,
-                messageAndCallback = new()
-                {
-                    eventData = eventData,
-                    MessageType = RtsMessageType.Event,
-                },
-                ReservedByte = 0,
-            });
-            PacketManager.Send(item, item.GetLastConnection(), header);
+            case 0:
+                return game.Peers.Where(x=> x != peer).ToList();
+            case 1:
+                return game.Peers;
+            case 2:
+                // this should be good until host leaves.
+                return [game.Peers.First()];
+            default:
+                return [];
         }
     }
 
+    public static void PushEventToPeers(string id, EventData eventData, List<ClientPeer> peer)
+    {
+        foreach (var item in peer)
+        {
+            PushEventToPeer(id, eventData, item);
+        }
+    }
 
+    public static void PushEventToPeer(string id, EventData eventData, ClientPeer peer)
+    {
+        var game = GetGame(id);
+        Header header = new()
+        {
+            CrcOrEncrypted = 0,
+            PeerId = 0,
+            Commands = [],
+            ServerTime = Environment.TickCount,
+            Challenge = peer.Challenge,
+        };
+        header.Commands.Add(new()
+        {
+            commandType = CommandType.SendReliable,
+            ReliableSequenceNumber = peer.LastReliableSequence[peer.GetLastConnection()!.Server.Id] + 1,
+            Size = 12,
+            ChannelID = 0,
+            CommandFlags = 1,
+            messageAndCallback = new()
+            {
+                eventData = eventData,
+                MessageType = RtsMessageType.Event,
+            },
+            ReservedByte = 4,
+        });
+        PacketManager.Send(peer, peer.GetLastConnection(), header);
+    }
 
     public static void LeaveGamePeer(string id, ClientPeer peer)
     {
